@@ -1,0 +1,310 @@
+'use strict';
+
+const vscode = require('vscode');
+const path   = require('path');
+const cp     = require('child_process');
+const fs     = require('fs');
+const { syncTestCasesToInput }                          = require('../utils/testcase-sync');
+const { getWorkspaceRoot, discoverTopics, scanProblemsInTopic } = require('../utils/workspace');
+
+// Language runner config
+//
+// build(file)              → shell command to compile (null = no compile step)
+// run(file, input, output) → shell command to execute
+//
+// Both pipe stdin from input.txt and stdout+stderr to output.txt.
+// 2>&1 merges stderr into stdout so compile errors appear in output.txt.
+const RUNNERS = {
+  '.py': {
+    label: 'Python — solution.py',
+    build: null,
+    run:   (file, inputFile, outputFile) =>
+      `python3 "${file}" < "${inputFile}" > "${outputFile}" 2>&1`,
+  },
+  '.cpp': {
+    label: 'C++ — solution.cpp',
+    build: (file) =>
+      `g++ -std=c++17 -O2 -Wall "${file}" -o /tmp/dsa_sol_cpp 2>&1`,
+    run:   (_file, inputFile, outputFile) =>
+      `/tmp/dsa_sol_cpp < "${inputFile}" > "${outputFile}" 2>&1`,
+  },
+  '.rs': {
+    label: 'Rust — solution.rs',
+    build: (file) =>
+      `rustc "${file}" -o /tmp/dsa_sol_rs 2>&1`,
+    run:   (_file, inputFile, outputFile) =>
+      `/tmp/dsa_sol_rs < "${inputFile}" > "${outputFile}" 2>&1`,
+  },
+};
+
+const SOLUTION_FILES = ['solution.py', 'solution.cpp', 'solution.rs'];
+
+const FILE_ICONS = {
+  '.py':  '$(symbol-misc)',
+  '.cpp': '$(symbol-class)',
+  '.rs':  '$(symbol-enum)',
+};
+
+// Main command — Cmd+Shift+R
+async function cmdRunSolution() {
+  try {
+    const root = getWorkspaceRoot();
+    if (!root) return;
+
+    // Detect whether a problem is already open in the layout─
+    const openProblemDir = getOpenProblemDir(root);
+
+    let problemDir;
+
+    if (openProblemDir) {
+      // Flow A — problem open → skip topic + problem picker
+      problemDir = openProblemDir;
+    } else {
+      // Flow B — nothing open → full 3-step picker
+      problemDir = await pickProblemDir(root);
+      if (!problemDir) return;
+    }
+
+    // Pick which solution file to run
+    const solutionFile = await pickSolutionFile(problemDir);
+    if (!solutionFile) return;
+
+    // Run
+    await runFile(root, problemDir, solutionFile);
+
+  } catch (err) {
+    vscode.window.showErrorMessage(`DSA Run: ${err.message}`);
+    console.error('[run-solution]', err);
+  }
+}
+
+// Detect open problem dir from current tab groups.
+// Looks for any open tab whose path is: root/topic/problem/file
+// Returns the absolute problem folder path, or null.
+function getOpenProblemDir(root) {
+  const openTabPaths = vscode.window.tabGroups.all
+    .flatMap(g => g.tabs)
+    .map(t => t?.input?.uri?.fsPath)
+    .filter(Boolean);
+
+  for (const tabPath of openTabPaths) {
+    const rel = path.relative(root, tabPath);
+    if (rel.startsWith('..')) continue;
+
+    const parts = rel.split(path.sep);
+    // Needs at least: topic / problem / file  (3 parts)
+    if (parts.length < 3) continue;
+    // Skip _progress, _templates, .vscode etc
+    if (parts[0].startsWith('_') || parts[0].startsWith('.')) continue;
+    // Problem folder must start with digits e.g. 001_two_sum
+    if (!/^\d+_/.test(parts[1])) continue;
+
+    return path.join(root, parts[0], parts[1]);
+  }
+  return null;
+}
+
+// Flow B — 2-step picker: topic → problem
+// Returns absolute problem folder path, or null if cancelled.
+async function pickProblemDir(root) {
+  // Step 1 of 3 — topic
+  const topics = discoverTopics(root);
+  if (topics.length === 0) {
+    vscode.window.showErrorMessage('DSA Run: No topics found.');
+    return null;
+  }
+
+  const topicItems = topics.map(t => ({
+    label:       `$(file-directory)  ${t}`,
+    description: '',
+    topic:       t,
+  }));
+
+  const pickedTopic = await vscode.window.showQuickPick(topicItems, {
+    placeHolder:        'Step 1 of 3 — Select topic',
+    matchOnDescription: false,
+  });
+  if (!pickedTopic) return null;
+
+  // Step 2 of 3 — problem
+  const topicPath = path.join(root, pickedTopic.topic);
+  const problems  = scanProblemsInTopic(topicPath);
+
+  if (problems.length === 0) {
+    vscode.window.showErrorMessage(
+      `DSA Run: No problems found in ${pickedTopic.topic}`
+    );
+    return null;
+  }
+
+  const problemItems = problems.map(p => ({
+    label:       `$(file-directory)  ${p}`,
+    description: pickedTopic.topic,
+    prob:        p,
+  }));
+
+  const pickedProblem = await vscode.window.showQuickPick(problemItems, {
+    placeHolder:        'Step 2 of 3 — Select problem',
+    matchOnDescription: true,
+  });
+  if (!pickedProblem) return null;
+
+  return path.join(topicPath, pickedProblem.prob);
+}
+
+// Pick solution file from the problem folder.
+// Only shows files that actually exist.
+// Skips picker entirely if only one file exists.
+async function pickSolutionFile(problemDir) {
+  const existing = SOLUTION_FILES.filter(f =>
+    fs.existsSync(path.join(problemDir, f))
+  );
+
+  if (existing.length === 0) {
+    vscode.window.showErrorMessage(
+      `DSA Run: No solution files found in ${path.basename(problemDir)}`
+    );
+    return null;
+  }
+
+  // Single file — no need to ask
+  if (existing.length === 1) return existing[0];
+
+  const fileItems = existing.map(f => ({
+    label:       `${FILE_ICONS[path.extname(f)] ?? '$(file)'}  ${f}`,
+    description: path.basename(problemDir),
+    file:        f,
+  }));
+
+  const picked = await vscode.window.showQuickPick(fileItems, {
+    placeHolder: 'Step 3 of 3 — Select solution file to run',
+  });
+
+  return picked?.file ?? null;
+}
+
+// Run a solution file.
+//
+// Steps:
+//   1. Sync PROBLEM.md test cases → root/input.txt
+//   2. Compile (C++ / Rust only) — errors → output.txt + notification
+//   3. Execute — stdin from input.txt, stdout+stderr → output.txt
+//   4. Reveal output.txt in Col 3
+//   5. Success / error notification
+async function runFile(root, problemDir, fileName) {
+  // 1. Sync test cases → input.txt before every run
+  syncTestCasesToInput(root, problemDir);
+
+  const ext    = path.extname(fileName);   // '.py' | '.cpp' | '.rs'
+  const runner = RUNNERS[ext];
+
+  if (!runner) {
+    vscode.window.showErrorMessage(
+      `DSA Run: No runner configured for "${ext}" files`
+    );
+    return;
+  }
+
+  // Resolve paths
+  const absFile    = path.join(problemDir, fileName);   // ← was missing/undefined before
+  const inputFile  = path.join(root, 'input.txt');
+  const outputFile = path.join(root, 'output.txt');
+
+  // Ensure input.txt exists (may be empty if no test cases)
+  if (!fs.existsSync(inputFile)) fs.writeFileSync(inputFile, '', 'utf8');
+
+  // Status bar spinner
+  const statusItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Left,
+    100
+  );
+  statusItem.text    = `$(sync~spin)  Running ${fileName}...`;
+  statusItem.tooltip = `DSA: running ${path.basename(problemDir)}/${fileName}`;
+  statusItem.show();
+
+  try {
+    // 2. Compile step (C++ and Rust only)
+    if (runner.build) {
+      const buildCmd = runner.build(absFile);   // ← fixed: was runner.buildCmd
+      console.log('[run-solution] compile:', buildCmd);
+
+      const buildResult = await execCommand(buildCmd, problemDir);
+
+      if (buildResult.exitCode !== 0) {
+        // Write compile errors to output.txt — visible in layout Col 3
+        fs.writeFileSync(
+          outputFile,
+          `=== COMPILE ERROR ===\n\n${buildResult.stdout}\n`,
+          'utf8'
+        );
+
+        // Reveal output.txt (already open in Col 3, just focus it)
+        await revealOutput(outputFile);
+
+        vscode.window.showErrorMessage(
+          `DSA Run: ${fileName} — compile failed. See output.txt`
+        );
+        return;   // don't attempt to run
+      }
+
+      console.log('[run-solution] compile OK');
+    }
+
+    // 3. Run step
+    const runCmd = runner.run(absFile, inputFile, outputFile);
+    console.log('[run-solution] run:', runCmd);
+
+    const runResult = await execCommand(runCmd, problemDir);
+
+    // 4. Reveal output.txt
+    await revealOutput(outputFile);
+
+    // 5. Notification─
+    if (runResult.exitCode !== 0) {
+      vscode.window.showWarningMessage(
+        `DSA Run: ${fileName} exited with code ${runResult.exitCode} — check output.txt`
+      );
+    } else {
+      vscode.window.showInformationMessage(
+        `DSA Run: ${fileName} ✓ — output written to output.txt`
+      );
+    }
+
+  } finally {
+    // Always dispose spinner regardless of success/failure
+    statusItem.dispose();
+  }
+}
+
+// Reveal output.txt in Col 3 without stealing focus from the
+// solution file the user is editing.
+async function revealOutput(outputFile) {
+  try {
+    await vscode.window.showTextDocument(
+      vscode.Uri.file(outputFile),
+      {
+        viewColumn:    vscode.ViewColumn.Three,
+        preview:       false,
+        preserveFocus: true,   // keep cursor in solution file
+      }
+    );
+  } catch (e) {
+    console.error('[run-solution] revealOutput failed:', e.message);
+  }
+}
+
+// Shell executor — wraps child_process.exec in a Promise.
+// Merges stdout + stderr so all output ends up in one place.
+// Returns { exitCode, stdout }.
+function execCommand(cmd, cwd) {
+  return new Promise(resolve => {
+    cp.exec(cmd, { cwd }, (err, stdout, stderr) => {
+      resolve({
+        exitCode: err?.code ?? 0,
+        stdout:   (stdout ?? '') + (stderr ?? ''),
+      });
+    });
+  });
+}
+
+module.exports = { cmdRunSolution };

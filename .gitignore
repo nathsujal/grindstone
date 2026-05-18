@@ -1,0 +1,81 @@
+# Grindstone - VS Code Extension
+
+
+# VS Code (local development)
+.vscode/
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/extensions.json
+
+
+# Node.js / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+
+# VSIX Package (generated)
+*.vsix
+!dsa-layout-*.vsix  # Keep release packages, ignore dev builds
+
+
+# OS-specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+
+# Logs & Temporary Files
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+
+# Extension Backups
+*.backup
+*.backup.js
+
+
+# Build Output
+out/
+dist/
+lib/
+
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+
+# Test Coverage
+coverage/
+.nyc_output/
+
+
+# GitNexus (code intelligence)
+.gitnexus/
+
+
+# IDEs
+.idea/
+*.iml
+.vs/
+*.sublime-*
+
+
+# Misc
+tmp/
+cache/

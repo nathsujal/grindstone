@@ -1,0 +1,89 @@
+{
+  "name": "grindstone",
+  "displayName": "Grindstone",
+  "description": "Persistent DSA workstation layout manager for VS Code",
+  "version": "2.0.0",
+  "publisher": "sujalnath",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:grindstone.openProblem",
+    "onCommand:grindstone.openProblemPath",
+    "onCommand:grindstone.clearLayout",
+    "onCommand:grindstone.newProblem",
+    "onCommand:grindstone.deleteProblem"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "grindstone.openProblem",
+        "title": "DSA: Open Problem Layout"
+      },
+      {
+        "command": "grindstone.openProblemPath",
+        "title": "DSA: Open Problem Path"
+      },
+      {
+        "command": "grindstone.clearLayout",
+        "title": "DSA: Clear Layout"
+      },
+      {
+        "command": "grindstone.newProblem",
+        "title": "DSA: New Problem"
+      },
+      {
+        "command": "grindstone.deleteProblem",
+        "title": "DSA: Delete Problem"
+      },
+      {
+        "command": "grindstone.runSolution",
+        "title": "DSA: Run Solution"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "grindstone.openProblem",
+        "key": "ctrl+shift+o",
+        "mac": "cmd+shift+o"
+      },
+      {
+        "command": "grindstone.clearLayout",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c"
+      },
+      {
+        "command": "grindstone.newProblem",
+        "key": "ctrl+shift+n",
+        "mac": "cmd+shift+n"
+      },
+      {
+        "command": "grindstone.deleteProblem",
+        "key": "ctrl+shift+d",
+        "mac": "cmd+shift+d"
+      },
+      {
+        "command": "grindstone.runSolution",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "when": "explorerResourceIsFolder",
+          "command": "grindstone.openProblemPath",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "turndown": "^7.2.4"
+  }
+}
