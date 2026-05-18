@@ -32,6 +32,17 @@ const QUERY = `
 `;
 
 /**
+ * Validate a LeetCode URL format.
+ *
+ * @param {string} url
+ * @returns {boolean}
+ */
+function isValidLeetCodeUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  return /leetcode\.com\/problems\/[^/?#]+/.test(url);
+}
+
+/**
  * Extract slug from a LeetCode URL.
  * Handles:
  *   https://leetcode.com/problems/two-sum/
@@ -47,7 +58,7 @@ function extractSlug(url) {
   if (!match) {
     throw new Error(
       `Invalid LeetCode URL: "${url}"\n` +
-      `Expected format: https://leetcode.com/problems/two-sum/`
+        'Expected format: https://leetcode.com/problems/two-sum/',
     );
   }
   return match[1];
@@ -66,9 +77,9 @@ async function fetchLeetCodeProblem(url) {
   let response;
   try {
     response = await fetch(LC_GRAPHQL_URL, {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
+      body: JSON.stringify({
         query: QUERY,
         variables: { titleSlug: slug },
       }),
@@ -114,35 +125,37 @@ async function fetchLeetCodeProblem(url) {
 function stripHtml(html) {
   if (!html) return '';
 
-  return html
-    // Block elements → newlines before stripping
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/li>/gi, '\n')
-    .replace(/<li>/gi, '- ')
-    .replace(/<\/pre>/gi, '\n')
-    .replace(/<pre>/gi, '\n```\n')
-    // Code blocks
-    .replace(/<code>/gi, '`')
-    .replace(/<\/code>/gi, '`')
-    // Bold / italic → keep text
-    .replace(/<\/?strong>/gi, '**')
-    .replace(/<\/?em>/gi, '_')
-    // Superscript
-    .replace(/<sup>/gi, '^')
-    .replace(/<\/sup>/gi, '')
-    // Strip all remaining tags
-    .replace(/<[^>]+>/g, '')
-    // HTML entities
-    .replace(/&lt;/g,   '<')
-    .replace(/&gt;/g,   '>')
-    .replace(/&amp;/g,  '&')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#39;/g,  "'")
-    .replace(/&quot;/g, '"')
-    // Collapse 3+ newlines to 2
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  return (
+    html
+      // Block elements → newlines before stripping
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/li>/gi, '\n')
+      .replace(/<li>/gi, '- ')
+      .replace(/<\/pre>/gi, '\n')
+      .replace(/<pre>/gi, '\n```\n')
+      // Code blocks
+      .replace(/<code>/gi, '`')
+      .replace(/<\/code>/gi, '`')
+      // Bold / italic → keep text
+      .replace(/<\/?strong>/gi, '**')
+      .replace(/<\/?em>/gi, '_')
+      // Superscript
+      .replace(/<sup>/gi, '^')
+      .replace(/<\/sup>/gi, '')
+      // Strip all remaining tags
+      .replace(/<[^>]+>/g, '')
+      // HTML entities
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&#39;/g, "'")
+      .replace(/&quot;/g, '"')
+      // Collapse 3+ newlines to 2
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  );
 }
 
 /**
@@ -155,7 +168,7 @@ function stripHtml(html) {
  */
 function getSnippet(snippets, langSlug) {
   if (!snippets?.length) return null;
-  const found = snippets.find(s => s.langSlug === langSlug);
+  const found = snippets.find((s) => s.langSlug === langSlug);
   return found?.code ?? null;
 }
 
@@ -164,4 +177,5 @@ module.exports = {
   extractSlug,
   stripHtml,
   getSnippet,
+  isValidLeetCodeUrl,
 };

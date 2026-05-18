@@ -9,7 +9,7 @@ const vscode = require('vscode');
  * @returns {Promise<void>}
  */
 function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 /**
@@ -39,7 +39,7 @@ function showDoc(uri, viewColumn) {
   return vscode.window.showTextDocument(uri, {
     viewColumn,
     preview: false,
-    preserveFocus: false
+    preserveFocus: false,
   });
 }
 
@@ -52,11 +52,10 @@ function showDoc(uri, viewColumn) {
  */
 async function waitForTab(uri, { timeout = 1500 } = {}) {
   const target = uri.fsPath;
-  return pollUntil(() =>
-    vscode.window.tabGroups.all.some(g =>
-      g.tabs.some(t => t.input?.uri?.fsPath === target)
-    ),
-    { interval: 30, timeout }
+  return pollUntil(
+    () =>
+      vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.input?.uri?.fsPath === target)),
+    { interval: 30, timeout },
   );
 }
 

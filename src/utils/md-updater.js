@@ -1,9 +1,8 @@
 'use strict';
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 const { scanMarkdownFiles } = require('./fs-utils');
-
 
 /**
  * Update all markdown links across workspace that point into oldAbsDir,
@@ -24,7 +23,7 @@ function updateLinksAcrossWorkspace(root, oldAbsDir, newAbsDir, onlyFiles = null
   const normNew = path.normalize(newAbsDir);
 
   const filesToScan = onlyFiles
-    ? onlyFiles.map(f => path.isAbsolute(f) ? f : path.join(root, f))
+    ? onlyFiles.map((f) => (path.isAbsolute(f) ? f : path.join(root, f)))
     : scanMarkdownFiles(root);
 
   let updatedCount = 0;
@@ -35,7 +34,9 @@ function updateLinksAcrossWorkspace(root, oldAbsDir, newAbsDir, onlyFiles = null
     let content;
     try {
       content = fs.readFileSync(absFilePath, 'utf8');
-    } catch { continue; }
+    } catch {
+      continue;
+    }
 
     const fileDir = path.dirname(absFilePath);
 
@@ -58,28 +59,24 @@ function updateLinksAcrossWorkspace(root, oldAbsDir, newAbsDir, onlyFiles = null
         // Check if this link points into the old problem dir
         // Use startsWith with separator to avoid partial matches
         // e.g. old=001_two_sum should NOT match 001_two_sum_extra
-        const oldWithSep = normOld.endsWith(path.sep)
-          ? normOld
-          : normOld + path.sep;
+        const oldWithSep = normOld.endsWith(path.sep) ? normOld : normOld + path.sep;
 
         if (absLink !== normOld && !absLink.startsWith(oldWithSep)) {
           return match;
         }
 
         // Compute new absolute target
-        const remainder = absLink.slice(normOld.length);   // e.g. /PROBLEM.md or ''
+        const remainder = absLink.slice(normOld.length); // e.g. /PROBLEM.md or ''
         const newAbsLink = normNew + remainder;
 
         // Convert back to relative from this file
-        const newRelLink = path.relative(fileDir, newAbsLink)
-          .split(path.sep).join('/');   // always forward slashes in markdown
+        const newRelLink = path.relative(fileDir, newAbsLink).split(path.sep).join('/'); // always forward slashes in markdown
 
         console.log(
-          `[md-updater] ${path.relative(root, absFilePath)}: ` +
-          `${rawLink} → ${newRelLink}`
+          `[md-updater] ${path.relative(root, absFilePath)}: ` + `${rawLink} → ${newRelLink}`,
         );
         return `${open}${newRelLink}${close}`;
-      }
+      },
     );
 
     if (updated !== content) {
@@ -114,22 +111,21 @@ function updateTrackerRow(trackerPath, topicName, problemName, newNumStr) {
     const lines = fs.readFileSync(trackerPath, 'utf8').split('\n');
     let changed = false;
 
-    const updated = lines.map(line => {
+    const updated = lines.map((line) => {
       if (!line.includes('|')) return line;
 
-      const cells = line.split('|').map(c => c.trim());
+      const cells = line.split('|').map((c) => c.trim());
       // cells[0] = '' (before first pipe), cells[1] = topic, cells[2] = number,
       // cells[3] = name, ...
       if (cells.length < 4) return line;
 
       const rowTopic = cells[1];
-      const rowName  = cells[3];
+      const rowName = cells[3];
 
       // Match by topic + name (name is stable, number changes)
-      const topicMatches = rowTopic === topicName ||
-        rowTopic.replace(/^\d+_/, '') === topicName.replace(/^\d+_/, '');
-      const nameMatches  = rowName === problemName ||
-        rowName.replace(/^\d+_/, '') === problemName;
+      const topicMatches =
+        rowTopic === topicName || rowTopic.replace(/^\d+_/, '') === topicName.replace(/^\d+_/, '');
+      const nameMatches = rowName === problemName || rowName.replace(/^\d+_/, '') === problemName;
 
       if (!topicMatches || !nameMatches) return line;
 

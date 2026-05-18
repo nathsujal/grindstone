@@ -6,11 +6,10 @@ const { stripHtml, getSnippet } = require('../services/leetcode');
  * Build the full content of PROBLEM.md from LC problem data.
  *
  * @param {Object} lc        raw LC API response
- * @param {string} numStr    zero-padded number e.g. '001'
  * @param {string} topicName e.g. '01_Arrays'
  * @returns {string}
  */
-function buildProblemMd(lc, numStr, topicName) {
+function buildProblemMd(lc, topicName) {
   const title      = lc.title ?? 'Unknown';
   const difficulty = lc.difficulty ?? '?';
   const content    = stripHtml(lc.content ?? '');
@@ -20,14 +19,14 @@ function buildProblemMd(lc, numStr, topicName) {
   const hints      = lc.hints ?? [];
 
   const hintsSection = hints.length > 0
-    ? `## Hints\n\n` +
+    ? '## Hints\n\n' +
       hints.map((h, i) => `<details>\n<summary>Hint ${i + 1}</summary>\n\n${h}\n\n</details>`).join('\n\n')
     : '';
 
-  const testCasesSection = `## Test Cases\n\n<!-- filled automatically from LC examples -->\n`;
+  const testCasesSection = '## Test Cases\n\n<!-- filled automatically from LC examples -->\n';
 
   return `\
-# ${numStr} — ${title}
+# ${title}
 
 **Link:** ${lcUrl}
 **Topic:** ${topicName}
@@ -93,9 +92,9 @@ ${hintsSection ? '\n---\n\n' + hintsSection : ''}
  * @param {string} numStr
  * @returns {string}
  */
-function buildPythonSolution(lc, numStr) {
+function buildPythonSolution(lc, _numStr) {
   const snippet = getSnippet(lc.codeSnippets, 'python3');
-  const header  = buildHeader(lc, numStr, 'Python3');
+  const header  = buildHeader(lc);
 
   return header + '\n' + (snippet ?? 'class Solution:\n    pass\n');
 }
@@ -107,13 +106,13 @@ function buildPythonSolution(lc, numStr) {
  * @param {string} numStr
  * @returns {string}
  */
-function buildCppSolution(lc, numStr) {
+function buildCppSolution(lc, _numStr) {
   const snippet = getSnippet(lc.codeSnippets, 'cpp');
-  const header  = buildHeader(lc, numStr, 'C++');
+  const header  = buildHeader(lc);
 
   const boilerplate = snippet
     ? `#include <bits/stdc++.h>\nusing namespace std;\n\n${snippet}`
-    : `#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    \n};\n\nint main() {\n    ios_base::sync_with_stdio(false);\n    cin.tie(NULL);\n    return 0;\n}\n`;
+    : '#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    \n};\n\nint main() {\n    ios_base::sync_with_stdio(false);\n    cin.tie(NULL);\n    return 0;\n}\n';
 
   return header + '\n' + boilerplate;
 }
@@ -126,9 +125,9 @@ function buildCppSolution(lc, numStr) {
  * @param {string} numStr
  * @returns {string}
  */
-function buildRustSolution(lc, numStr) {
+function buildRustSolution(lc, _numStr) {
   const snippet = getSnippet(lc.codeSnippets, 'rust');
-  const header  = buildHeader(lc, numStr, 'Rust');
+  const header  = buildHeader(lc);
 
   return header + '\n' + (snippet ?? 'fn main() {\n    \n}\n');
 }
@@ -146,9 +145,9 @@ function buildInputTxt(lc) {
   return raw.trim() + '\n';
 }
 
-// ── Internal helpers ──────────────────────────────────────────────
+// Internal helpers
 
-function buildHeader(lc, numStr, lang) {
+function buildHeader(lc) {
   return `\
 // ============================================================
 // Problem   : ${lc.title} — LeetCode #${lc.questionId}

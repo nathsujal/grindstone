@@ -16,7 +16,9 @@
     "onCommand:grindstone.openProblemPath",
     "onCommand:grindstone.clearLayout",
     "onCommand:grindstone.newProblem",
-    "onCommand:grindstone.deleteProblem"
+    "onCommand:grindstone.deleteProblem",
+    "onCommand:grindstone.runSolution",
+    "onCommand:grindstone.showIndexStats"
   ],
   "main": "./src/extension.js",
   "contributes": {
@@ -86,5 +88,18 @@
         }
       ]
     }
+  },
+  "scripts": {
+    "lint": "eslint src --ext .js",
+    "lint:fix": "eslint src --ext .js --fix",
+    "format": "prettier --write \"src/**/*.js\"",
+    "format:check": "prettier --check \"src/**/*.js\"",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "prettier": "^3.8.3",
+    "vitest": "^4.1.6"
   }
 }

@@ -24,16 +24,19 @@ function exists(filePath) {
 
 // check if path is directory
 function isDir(filePath) {
-  try { return fs.statSync(filePath).isDirectory(); }
-  catch { return false; }
+  try {
+    return fs.statSync(filePath).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 // scan all .md files in workspace
 function scanMarkdownFiles(root) {
   const mdFiles = [];
-  const skip = n => n.startsWith('_') || n.startsWith('.');
+  const skip = (n) => n.startsWith('_') || n.startsWith('.');
 
-  const scan = dir => {
+  const scan = (dir) => {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
       if (skip(entry.name)) continue;
@@ -46,7 +49,9 @@ function scanMarkdownFiles(root) {
   try {
     scan(root);
   } catch (err) {
-    vscode.window.showErrorMessage(`GrindStone: Cannot scan workspace for markdown files: ${err.message}`);
+    vscode.window.showErrorMessage(
+      `GrindStone: Cannot scan workspace for markdown files: ${err.message}`,
+    );
     throw err;
   }
 
@@ -63,11 +68,20 @@ function cleanupMarkdownReferences(root, deletedTopic, deletedProblem) {
     if (deletedProblem) {
       const fullPattern = new RegExp(`(${deletedTopic}/${deletedProblem})`, 'g');
       const namePattern = new RegExp(`\\b(${deletedProblem})\\b`, 'g');
-      if (fullPattern.test(content)) { content = content.replace(fullPattern, '~~$1~~'); modified = true; }
-      if (namePattern.test(content)) { content = content.replace(namePattern, '~~$1~~'); modified = true; }
+      if (fullPattern.test(content)) {
+        content = content.replace(fullPattern, '~~$1~~');
+        modified = true;
+      }
+      if (namePattern.test(content)) {
+        content = content.replace(namePattern, '~~$1~~');
+        modified = true;
+      }
     } else {
       const topicPattern = new RegExp(`(${deletedTopic}/\\d+_\\w+)`, 'g');
-      if (topicPattern.test(content)) { content = content.replace(topicPattern, '~~$1~~'); modified = true; }
+      if (topicPattern.test(content)) {
+        content = content.replace(topicPattern, '~~$1~~');
+        modified = true;
+      }
     }
 
     if (modified) writeFile(mdFile, content);
@@ -85,7 +99,12 @@ function rename(oldPath, newPath) {
 }
 
 module.exports = {
-  readFile, writeFile, exists, isDir,
-  scanMarkdownFiles, cleanupMarkdownReferences,
-  rmDir, rename
+  readFile,
+  writeFile,
+  exists,
+  isDir,
+  scanMarkdownFiles,
+  cleanupMarkdownReferences,
+  rmDir,
+  rename,
 };

@@ -40,9 +40,7 @@ function syncTestCasesToInput(root, problemDir) {
   const inputContent = testCases.join('\n') + '\n';
   fs.writeFileSync(globalInputPath, inputContent, 'utf8');
 
-  console.log(
-    `[testcase-sync] wrote ${testCases.length} testcase(s) to input.txt`
-  );
+  console.log(`[testcase-sync] wrote ${testCases.length} testcase(s) to input.txt`);
   return true;
 }
 
@@ -56,15 +54,11 @@ function syncTestCasesToInput(root, problemDir) {
  */
 function extractTestCases(mdContent) {
   // Captures everything between ## Test Cases and the next ## heading (or EOF)
-  const sectionMatch = mdContent.match(
-    /^##\s+Test Cases\s*\n([\s\S]*?)(?=^##\s|\Z)/m
-  );
+  const sectionMatch = mdContent.match(/^##\s+Test Cases\s*\n([\s\S]*?)(?=^##\s|\Z)/m);
 
   if (!sectionMatch) {
     // Try alternate heading names
-    const altMatch = mdContent.match(
-      /^##\s+Examples?\s*\n([\s\S]*?)(?=^##\s|\Z)/m
-    );
+    const altMatch = mdContent.match(/^##\s+Examples?\s*\n([\s\S]*?)(?=^##\s|\Z)/m);
     if (!altMatch) return [];
     return parseFencedBlocks(altMatch[1]);
   }
@@ -116,15 +110,16 @@ function writeTestCasesToProblemMd(problemDir, rawTestcases) {
   // Split LC's exampleTestcases by blank lines — each block = one testcase
   const cases = rawTestcases
     .trim()
-    .split(/\n{2,}/)                // multiple testcases separated by blank lines
-    .map(c => c.trim())
+    .split(/\n{2,}/) // multiple testcases separated by blank lines
+    .map((c) => c.trim())
     .filter(Boolean);
 
   // If no blank-line separation (single testcase or all on separate lines)
   // treat the whole string as one testcase
-  const fencedCases = cases.length > 0
-    ? cases.map(c => `\`\`\`\n${c}\n\`\`\``).join('\n\n')
-    : `\`\`\`\n${rawTestcases.trim()}\n\`\`\``;
+  const fencedCases =
+    cases.length > 0
+      ? cases.map((c) => `\`\`\`\n${c}\n\`\`\``).join('\n\n')
+      : `\`\`\`\n${rawTestcases.trim()}\n\`\`\``;
 
   const content = fs.readFileSync(mdPath, 'utf8');
 
@@ -132,7 +127,7 @@ function writeTestCasesToProblemMd(problemDir, rawTestcases) {
   // The section was created by buildProblemMd with a placeholder
   const updated = content.replace(
     /(^##\s+Test Cases\s*\n)([\s\S]*?)(?=^##\s|\Z)/m,
-    `$1\n${fencedCases}\n\n`
+    `$1\n${fencedCases}\n\n`,
   );
 
   if (updated !== content) {

@@ -1,14 +1,14 @@
 'use strict';
 
 const vscode = require('vscode');
-const path   = require('path');
-const os     = require('os');
+const path = require('path');
+const os = require('os');
 const crypto = require('crypto');
-const cp     = require('child_process');
-const fs     = require('fs');
-const { syncTestCasesToInput }                          = require('../utils/testcase-sync');
+const cp = require('child_process');
+const fs = require('fs');
+const { syncTestCasesToInput } = require('../utils/testcase-sync');
 const { getWorkspaceRoot, discoverTopics, scanProblemsInTopic } = require('../utils/workspace');
-const { getOpenProblemDir }                             = require('../utils/tab-utils');
+const { getOpenProblemDir } = require('../utils/tab-utils');
 
 // Language runner config
 //
@@ -21,21 +21,20 @@ const RUNNERS = {
   '.py': {
     label: 'Python — solution.py',
     build: null,
-    run:   (file, inputFile, outputFile) =>
+    run: (file, inputFile, outputFile) =>
       `python3 "${file}" < "${inputFile}" > "${outputFile}" 2>&1`,
   },
   '.cpp': {
     label: 'C++ — solution.cpp',
     build: (file, tmpDir) =>
       `g++ -std=c++17 -O2 -Wall "${file}" -o "${path.join(tmpDir, 'sol_cpp')}" 2>&1`,
-    run:   (_file, inputFile, outputFile, tmpDir) =>
+    run: (_file, inputFile, outputFile, tmpDir) =>
       `"${path.join(tmpDir, 'sol_cpp')}" < "${inputFile}" > "${outputFile}" 2>&1`,
   },
   '.rs': {
     label: 'Rust — solution.rs',
-    build: (file, tmpDir) =>
-      `rustc "${file}" -o "${path.join(tmpDir, 'sol_rs')}" 2>&1`,
-    run:   (_file, inputFile, outputFile, tmpDir) =>
+    build: (file, tmpDir) => `rustc "${file}" -o "${path.join(tmpDir, 'sol_rs')}" 2>&1`,
+    run: (_file, inputFile, outputFile, tmpDir) =>
       `"${path.join(tmpDir, 'sol_rs')}" < "${inputFile}" > "${outputFile}" 2>&1`,
   },
 };
@@ -43,9 +42,9 @@ const RUNNERS = {
 const SOLUTION_FILES = ['solution.py', 'solution.cpp', 'solution.rs'];
 
 const FILE_ICONS = {
-  '.py':  '$(symbol-misc)',
+  '.py': '$(symbol-misc)',
   '.cpp': '$(symbol-class)',
-  '.rs':  '$(symbol-enum)',
+  '.rs': '$(symbol-enum)',
 };
 
 // Main command — Cmd+Shift+R
@@ -74,7 +73,6 @@ async function cmdRunSolution() {
 
     // Run
     await runFile(root, problemDir, solutionFile);
-
   } catch (err) {
     vscode.window.showErrorMessage(`GrindStone Run: ${err.message}`);
     console.error('[run-solution]', err);
@@ -91,37 +89,35 @@ async function pickProblemDir(root) {
     return null;
   }
 
-  const topicItems = topics.map(t => ({
-    label:       `$(file-directory)  ${t}`,
+  const topicItems = topics.map((t) => ({
+    label: `$(file-directory)  ${t}`,
     description: '',
-    topic:       t,
+    topic: t,
   }));
 
   const pickedTopic = await vscode.window.showQuickPick(topicItems, {
-    placeHolder:        'Step 1 of 3 — Select topic',
+    placeHolder: 'Step 1 of 3 — Select topic',
     matchOnDescription: false,
   });
   if (!pickedTopic) return null;
 
   // Step 2 of 3 — problem
   const topicPath = path.join(root, pickedTopic.topic);
-  const problems  = scanProblemsInTopic(topicPath);
+  const problems = scanProblemsInTopic(topicPath);
 
   if (problems.length === 0) {
-    vscode.window.showErrorMessage(
-      `GrindStone Run: No problems found in ${pickedTopic.topic}`
-    );
+    vscode.window.showErrorMessage(`GrindStone Run: No problems found in ${pickedTopic.topic}`);
     return null;
   }
 
-  const problemItems = problems.map(p => ({
-    label:       `$(file-directory)  ${p}`,
+  const problemItems = problems.map((p) => ({
+    label: `$(file-directory)  ${p}`,
     description: pickedTopic.topic,
-    prob:        p,
+    prob: p,
   }));
 
   const pickedProblem = await vscode.window.showQuickPick(problemItems, {
-    placeHolder:        'Step 2 of 3 — Select problem',
+    placeHolder: 'Step 2 of 3 — Select problem',
     matchOnDescription: true,
   });
   if (!pickedProblem) return null;
@@ -133,13 +129,11 @@ async function pickProblemDir(root) {
 // Only shows files that actually exist.
 // Skips picker entirely if only one file exists.
 async function pickSolutionFile(problemDir) {
-  const existing = SOLUTION_FILES.filter(f =>
-    fs.existsSync(path.join(problemDir, f))
-  );
+  const existing = SOLUTION_FILES.filter((f) => fs.existsSync(path.join(problemDir, f)));
 
   if (existing.length === 0) {
     vscode.window.showErrorMessage(
-      `GrindStone Run: No solution files found in ${path.basename(problemDir)}`
+      `GrindStone Run: No solution files found in ${path.basename(problemDir)}`,
     );
     return null;
   }
@@ -147,10 +141,10 @@ async function pickSolutionFile(problemDir) {
   // Single file — no need to ask
   if (existing.length === 1) return existing[0];
 
-  const fileItems = existing.map(f => ({
-    label:       `${FILE_ICONS[path.extname(f)] ?? '$(file)'}  ${f}`,
+  const fileItems = existing.map((f) => ({
+    label: `${FILE_ICONS[path.extname(f)] ?? '$(file)'}  ${f}`,
     description: path.basename(problemDir),
-    file:        f,
+    file: f,
   }));
 
   const picked = await vscode.window.showQuickPick(fileItems, {
@@ -172,19 +166,17 @@ async function runFile(root, problemDir, fileName) {
   // 1. Sync test cases → input.txt before every run
   syncTestCasesToInput(root, problemDir);
 
-  const ext    = path.extname(fileName);   // '.py' | '.cpp' | '.rs'
+  const ext = path.extname(fileName); // '.py' | '.cpp' | '.rs'
   const runner = RUNNERS[ext];
 
   if (!runner) {
-    vscode.window.showErrorMessage(
-      `GrindStone Run: No runner configured for "${ext}" files`
-    );
+    vscode.window.showErrorMessage(`GrindStone Run: No runner configured for "${ext}" files`);
     return;
   }
 
   // Resolve paths
-  const absFile    = path.join(problemDir, fileName);
-  const inputFile  = path.join(root, 'input.txt');
+  const absFile = path.join(problemDir, fileName);
+  const inputFile = path.join(root, 'input.txt');
   const outputFile = path.join(root, 'output.txt');
 
   // Workspace-specific temp dir to avoid conflicts between workspaces
@@ -192,15 +184,33 @@ async function runFile(root, problemDir, fileName) {
   const tmpDir = path.join(os.tmpdir(), `grindstone-${workspaceHash}`);
   fs.mkdirSync(tmpDir, { recursive: true });
 
+  // Validate compiler exists for compiled languages
+  if (ext === '.cpp') {
+    try {
+      cp.execSync('g++ --version', { stdio: 'ignore' });
+    } catch {
+      throw new Error('g++ compiler not found. Install Xcode Command Line Tools (Mac) or g++ (Linux).');
+    }
+  }
+  if (ext === '.rs') {
+    try {
+      cp.execSync('rustc --version', { stdio: 'ignore' });
+    } catch {
+      throw new Error('rustc compiler not found. Install via rustup: https://rustup.rs');
+    }
+  }
+
+  // Validate input file exists
+  if (!fs.existsSync(inputFile)) {
+    throw new Error(`Input file not found: ${path.basename(inputFile)}`);
+  }
+
   // Ensure input.txt exists (may be empty if no test cases)
   if (!fs.existsSync(inputFile)) fs.writeFileSync(inputFile, '', 'utf8');
 
   // Status bar spinner
-  const statusItem = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Left,
-    100
-  );
-  statusItem.text    = `$(sync~spin)  Running ${fileName}...`;
+  const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  statusItem.text = `$(sync~spin)  Running ${fileName}...`;
   statusItem.tooltip = `DSA: running ${path.basename(problemDir)}/${fileName}`;
   statusItem.show();
 
@@ -213,14 +223,10 @@ async function runFile(root, problemDir, fileName) {
       const buildResult = await execCommand(buildCmd, problemDir);
 
       if (buildResult.exitCode !== 0) {
-        fs.writeFileSync(
-          outputFile,
-          `=== COMPILE ERROR ===\n\n${buildResult.stdout}\n`,
-          'utf8'
-        );
+        fs.writeFileSync(outputFile, `=== COMPILE ERROR ===\n\n${buildResult.stdout}\n`, 'utf8');
         await revealOutput(outputFile);
         vscode.window.showErrorMessage(
-          `GrindStone Run: ${fileName} — compile failed. See output.txt`
+          `GrindStone Run: ${fileName} — compile failed. See output.txt`,
         );
         return;
       }
@@ -240,14 +246,13 @@ async function runFile(root, problemDir, fileName) {
     // 5. Notification
     if (runResult.exitCode !== 0) {
       vscode.window.showWarningMessage(
-        `GrindStone Run: ${fileName} exited with code ${runResult.exitCode} — check output.txt`
+        `GrindStone Run: ${fileName} exited with code ${runResult.exitCode} — check output.txt`,
       );
     } else {
       vscode.window.showInformationMessage(
-        `GrindStone Run: ${fileName} ✓ — output written to output.txt`
+        `GrindStone Run: ${fileName} ✓ — output written to output.txt`,
       );
     }
-
   } finally {
     statusItem.dispose();
     // Clean up workspace-specific temp dir
@@ -262,14 +267,11 @@ async function runFile(root, problemDir, fileName) {
 // Reveal output.txt in Col 3 without stealing focus from the solution file.
 async function revealOutput(outputFile) {
   try {
-    await vscode.window.showTextDocument(
-      vscode.Uri.file(outputFile),
-      {
-        viewColumn:    vscode.ViewColumn.Three,
-        preview:       false,
-        preserveFocus: true,
-      }
-    );
+    await vscode.window.showTextDocument(vscode.Uri.file(outputFile), {
+      viewColumn: vscode.ViewColumn.Three,
+      preview: false,
+      preserveFocus: true,
+    });
   } catch (e) {
     console.error('[run-solution] revealOutput failed:', e.message);
   }
@@ -277,11 +279,11 @@ async function revealOutput(outputFile) {
 
 // Shell executor — wraps child_process.exec in a Promise.
 function execCommand(cmd, cwd) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     cp.exec(cmd, { cwd }, (err, stdout, stderr) => {
       resolve({
         exitCode: err?.code ?? 0,
-        stdout:   (stdout ?? '') + (stderr ?? ''),
+        stdout: (stdout ?? '') + (stderr ?? ''),
       });
     });
   });

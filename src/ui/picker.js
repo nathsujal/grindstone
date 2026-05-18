@@ -10,7 +10,7 @@ async function showProblemPicker(items) {
   }
   return vscode.window.showQuickPick(items, {
     placeHolder: 'Select a problem',
-    matchOnDescription: true
+    matchOnDescription: true,
   });
 }
 
@@ -20,10 +20,10 @@ async function showTopicPicker(topics) {
     vscode.window.showErrorMessage('GrindStone: No topic folders found.');
     return null;
   }
-  const topicPicks = topics.map(t => ({ label: t }));
+  const topicPicks = topics.map((t) => ({ label: t }));
   return vscode.window.showQuickPick(topicPicks, {
     placeHolder: 'Select a topic',
-    matchOnDescription: false
+    matchOnDescription: false,
   });
 }
 
@@ -31,28 +31,28 @@ async function showTopicPicker(topics) {
 async function showDeletePicker(topic, problems) {
   const hasProblems = problems.length > 0;
   const deleteOptions = [
-    { label: `$(trash) Delete entire topic "${topic}"`, value: 'topic', description: 'Deletes all problems in this topic' }
+    {
+      label: `$(trash) Delete entire topic "${topic}"`,
+      value: 'topic',
+      description: 'Deletes all problems in this topic',
+    },
   ];
 
   if (hasProblems) {
-    deleteOptions.push(...problems.map(p => ({
-      label: `$(file-directory) ${p}`,
-      value: p,
-      description: 'Delete single problem'
-    })));
+    deleteOptions.push(
+      ...problems.map((p) => ({
+        label: `$(file-directory) ${p}`,
+        value: p,
+        description: 'Delete single problem',
+      })),
+    );
   }
 
   return vscode.window.showQuickPick(deleteOptions, {
-    placeHolder: hasProblems ? 'Select what to delete' : 'Topic is empty - select delete entire topic',
-    matchOnDescription: false
-  });
-}
-
-// show input box for problem name
-async function askProblemName() {
-  return vscode.window.showInputBox({
-    prompt: 'Problem name (e.g. two sum)',
-    placeHolder: 'e.g. two sum'
+    placeHolder: hasProblems
+      ? 'Select what to delete'
+      : 'Topic is empty - select delete entire topic',
+    matchOnDescription: false,
   });
 }
 
@@ -66,7 +66,7 @@ async function confirmDelete(isWholeTopic, itemName) {
     confirmMessage,
     { modal: true },
     'Delete',
-    'Cancel'
+    'Cancel',
   );
   return confirm === 'Delete';
 }
@@ -75,6 +75,5 @@ module.exports = {
   showProblemPicker,
   showTopicPicker,
   showDeletePicker,
-  askProblemName,
-  confirmDelete
+  confirmDelete,
 };

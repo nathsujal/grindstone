@@ -1,7 +1,7 @@
 'use strict';
 
 const vscode = require('vscode');
-const path   = require('path');
+const path = require('path');
 
 /**
  * Detect the open problem directory from current tab groups.
@@ -13,8 +13,8 @@ const path   = require('path');
  */
 function getOpenProblemDir(root) {
   const openTabPaths = vscode.window.tabGroups.all
-    .flatMap(g => g.tabs)
-    .map(t => t?.input?.uri?.fsPath)
+    .flatMap((g) => g.tabs)
+    .map((t) => t?.input?.uri?.fsPath)
     .filter(Boolean);
 
   for (const tabPath of openTabPaths) {

@@ -20,12 +20,12 @@ function startWatcher(root) {
   const pattern = new vscode.RelativePattern(root, '**/*.md');
   const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
-  watcher.onDidChange(uri => scheduleReindex(root, uri.fsPath));
-  watcher.onDidCreate(uri => scheduleReindex(root, uri.fsPath));
+  watcher.onDidChange((uri) => scheduleReindex(root, uri.fsPath));
+  watcher.onDidCreate((uri) => scheduleReindex(root, uri.fsPath));
 
-  watcher.onDidDelete(uri => {
+  watcher.onDidDelete((uri) => {
     const absPath = uri.fsPath;
-    _changedFiles.delete(absPath);  // no need to reindex deleted file
+    _changedFiles.delete(absPath); // no need to reindex deleted file
     onFileDeleted(root, absPath);
   });
 

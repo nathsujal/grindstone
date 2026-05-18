@@ -37,7 +37,9 @@ async function updateTracker(root, topic, number, name) {
     const today = new Date().toISOString().split('T')[0];
     const row = `| ${topic} | ${number} | ${name} | ? | Todo | — | ${today} |`;
     fs.appendFileSync(trackerPath, '\n' + row);
-  } catch (err) { console.error('[tracker] failed to update TRACKER.md:', err.message); }
+  } catch (err) {
+    console.error('[tracker] failed to update TRACKER.md:', err.message);
+  }
 }
 
 /**
@@ -49,20 +51,26 @@ async function updateTracker(root, topic, number, name) {
  * @returns {void}
  */
 function strikeTrackerRow(trackerPath, topicName, problemNum) {
-  if (!exists(trackerPath)) { console.log('[tracker] TRACKER.md not found, skipping strikethrough'); return; }
+  if (!exists(trackerPath)) {
+    console.log('[tracker] TRACKER.md not found, skipping strikethrough');
+    return;
+  }
 
   const lines = readFile(trackerPath).split('\n');
-  const updated = lines.map(line => {
+  const updated = lines.map((line) => {
     if (!line.includes('|')) return line;
-    const cells = line.split('|').filter(c => c.trim());
+    const cells = line.split('|').filter((c) => c.trim());
     if (cells.length < 2) return line;
 
     const rowTopic = cells[0].trim();
     const rowNum = cells[1].trim();
 
-    if (rowNum === problemNum && (rowTopic === topicName || rowTopic.includes(topicName.replace(/^\d+_/, '')))) {
+    if (
+      rowNum === problemNum &&
+      (rowTopic === topicName || rowTopic.includes(topicName.replace(/^\d+_/, '')))
+    ) {
       if (rowTopic.startsWith('~~')) return line;
-      const struck = cells.map(cell => {
+      const struck = cells.map((cell) => {
         const trimmed = cell.trim();
         if (!trimmed || trimmed.startsWith('~~')) return trimmed;
         return '~~' + trimmed + '~~';
@@ -83,21 +91,25 @@ function strikeTrackerRow(trackerPath, topicName, problemNum) {
  * @returns {void}
  */
 function strikeAllTopicRows(trackerPath, topicName) {
-  if (!exists(trackerPath)) { console.log('[tracker] TRACKER.md not found, skipping strikethrough'); return; }
+  if (!exists(trackerPath)) {
+    console.log('[tracker] TRACKER.md not found, skipping strikethrough');
+    return;
+  }
 
   const topicBase = topicName.replace(/^\d+_/, '');
   const lines = readFile(trackerPath).split('\n');
-  const updated = lines.map(line => {
+  const updated = lines.map((line) => {
     if (!line.includes('|')) return line;
-    const cells = line.split('|').filter(c => c.trim());
+    const cells = line.split('|').filter((c) => c.trim());
     if (cells.length < 1) return line;
 
     const rowTopic = cells[0].trim();
-    const matches = rowTopic === topicName || rowTopic === topicBase || rowTopic.includes(topicBase);
+    const matches =
+      rowTopic === topicName || rowTopic === topicBase || rowTopic.includes(topicBase);
     if (!matches) return line;
     if (rowTopic.startsWith('~~')) return line;
 
-    const struck = cells.map(cell => {
+    const struck = cells.map((cell) => {
       const trimmed = cell.trim();
       if (!trimmed || trimmed.startsWith('~~')) return trimmed;
       return '~~' + trimmed + '~~';

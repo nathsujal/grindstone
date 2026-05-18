@@ -1,6 +1,6 @@
 'use strict';
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 const { LINK_INDEX_FILE, CURRENT_INDEX_VERSION, INDEX_PERSIST_DELAY } = require('../constants');
 const { scanMarkdownFiles } = require('../utils/fs-utils');
@@ -28,10 +28,10 @@ const INDEX_VERSIONS = {
 //   }
 // }
 
-let _index  = null;
-let _root   = null;
-let _dirty  = false;
-let _timer  = null;
+let _index = null;
+let _root = null;
+let _dirty = false;
+let _timer = null;
 
 // Public API
 
@@ -45,7 +45,7 @@ let _timer  = null;
 async function ensureIndex(root) {
   _root = root;
 
-  if (_index && !isStale(root)) return;   // already fresh in memory
+  if (_index && !isStale(root)) return; // already fresh in memory
 
   const indexPath = getIndexPath(root);
 
@@ -133,15 +133,17 @@ async function _buildIndex(root) {
   }
 
   _index = {
-    version:  CURRENT_INDEX_VERSION,
+    version: CURRENT_INDEX_VERSION,
     built_at: Date.now(),
     entries,
   };
 
   _dirty = false;
-  persistNow(root);   // write immediately on full rebuild
+  persistNow(root); // write immediately on full rebuild
 
-  console.log(`[link-index] built in ${Date.now() - start}ms — ${Object.keys(entries).length} entries`);
+  console.log(
+    `[link-index] built in ${Date.now() - start}ms — ${Object.keys(entries).length} entries`,
+  );
 }
 
 /**
@@ -205,7 +207,7 @@ function onProblemRenamed(root, oldRelPath, newRelPath, renamedFiles = new Map()
   }
 
   // Move entry, updating any referenced_by paths that were also renamed
-  const updatedRefs = existing.referenced_by.map(refPath => {
+  const updatedRefs = existing.referenced_by.map((refPath) => {
     const absOld = path.join(root, refPath);
     const absNew = renamedFiles.get(absOld);
     if (absNew) return path.relative(root, absNew).split(path.sep).join('/');
@@ -330,12 +332,18 @@ function isStaleTimestamp(root, builtAt) {
   try {
     const mdFiles = scanMarkdownFiles(root);
     if (mdFiles.length === 0) return false;
-    const newestMtime = Math.max(...mdFiles.map(f => {
-      try { return fs.statSync(f).mtimeMs; } catch { return 0; }
-    }));
+    const newestMtime = Math.max(
+      ...mdFiles.map((f) => {
+        try {
+          return fs.statSync(f).mtimeMs;
+        } catch {
+          return 0;
+        }
+      }),
+    );
     return newestMtime > builtAt;
   } catch {
-    return true;   // if we can't check, assume stale
+    return true; // if we can't check, assume stale
   }
 }
 
@@ -429,7 +437,7 @@ function resolveLinkToProblemRel(root, absFilePath, rawLink) {
     // a problem dir (starts with digits), it's a valid problem reference
     if (parts.length < 2) return null;
 
-    const topicPart   = parts[0];
+    const topicPart = parts[0];
     const problemPart = parts[1];
 
     // Topic must not be a special folder
@@ -453,21 +461,32 @@ function resolveLinkToProblemRel(root, absFilePath, rawLink) {
  */
 function discoverAllProblemDirs(root) {
   const results = [];
-  const isDir = p => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
-  const skip  = n => n.startsWith('_') || n.startsWith('.');
+  const isDir = (p) => {
+    try {
+      return fs.statSync(p).isDirectory();
+    } catch {
+      return false;
+    }
+  };
+  const skip = (n) => n.startsWith('_') || n.startsWith('.');
 
   let topics;
   try {
-    topics = fs.readdirSync(root).filter(d => !skip(d) && isDir(path.join(root, d)));
-  } catch { return results; }
+    topics = fs.readdirSync(root).filter((d) => !skip(d) && isDir(path.join(root, d)));
+  } catch {
+    return results;
+  }
 
   for (const topic of topics) {
     const topicPath = path.join(root, topic);
     let problems;
     try {
-      problems = fs.readdirSync(topicPath)
-        .filter(d => !skip(d) && /^\d+_/.test(d) && isDir(path.join(topicPath, d)));
-    } catch { continue; }
+      problems = fs
+        .readdirSync(topicPath)
+        .filter((d) => !skip(d) && /^\d+_/.test(d) && isDir(path.join(topicPath, d)));
+    } catch {
+      continue;
+    }
 
     for (const prob of problems) {
       results.push(`${topic}/${prob}`);
@@ -482,7 +501,7 @@ function discoverAllProblemDirs(root) {
  * @param {string} root
  * @returns {{ entryCount: number, builtAt: string, version: number, isDirty: boolean, staleness: string } | { status: string }}
  */
-function getIndexStats(root) {
+function getIndexStats(_root) {
   if (!_index) {
     return { status: 'not initialized' };
   }
