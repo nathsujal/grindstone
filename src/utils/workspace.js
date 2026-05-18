@@ -22,7 +22,7 @@ function isValidDsaWorkspace(root) {
 }
 
 // skip folders starting with _ or .
-const shouldSkip = (n) => n.startsWith('_') || n.startsWith('.');
+const isSpecialFolder = (n) => n.startsWith('_') || n.startsWith('.');
 
 // discover all topic folders
 function discoverTopics(root) {
@@ -30,7 +30,7 @@ function discoverTopics(root) {
   try {
     const dirs = fs
       .readdirSync(root)
-      .filter((d) => !shouldSkip(d))
+      .filter((d) => !isSpecialFolder(d))
       .filter((d) => isDir(path.join(root, d)));
     topics.push(...dirs.sort());
   } catch (e) {
@@ -50,7 +50,7 @@ function scanProblemsInTopic(topicPath) {
   try {
     return fs
       .readdirSync(topicPath)
-      .filter((d) => !shouldSkip(d) && isDir(path.join(topicPath, d)))
+      .filter((d) => !isSpecialFolder(d) && isDir(path.join(topicPath, d)))
       .sort();
   } catch {
     return [];
@@ -76,7 +76,7 @@ function scanProblems(root) {
   try {
     const topicDirs = fs
       .readdirSync(root)
-      .filter((d) => !shouldSkip(d))
+      .filter((d) => !isSpecialFolder(d))
       .filter((d) => isDir(path.join(root, d)));
     for (const topic of topicDirs) {
       const topicPath = path.join(root, topic);

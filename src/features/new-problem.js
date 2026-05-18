@@ -2,19 +2,10 @@
 
 const vscode = require('vscode');
 const path = require('path');
-const fs = require('fs');
 
-const { getWorkspaceRoot, discoverTopics, getNextProblemNumber } = require('../utils/workspace');
-const { writeTestCasesToProblemMd, syncTestCasesToInput } = require('../utils/testcase-sync');
-const { getTrackerPath } = require('../utils/tracker');
-const { onProblemCreated } = require('../services/link-index');
+const { getWorkspaceRoot, discoverTopics } = require('../utils/workspace');
 const { fetchLeetCodeProblem } = require('../services/leetcode');
-const {
-  buildProblemMd,
-  buildPythonSolution,
-  buildCppSolution,
-  buildRustSolution,
-} = require('../utils/lc-mapper');
+const { createProblem } = require('../services/problem-creator');
 const { openLayout } = require('../ui/layout');
 
 // Main command — Cmd+Shift+N
@@ -23,75 +14,26 @@ async function cmdNewProblem() {
     const root = getWorkspaceRoot();
     if (!root) return;
 
-    // Step 1: Pick topic
-    // Returns a plain string e.g. '01_Arrays', or null if cancelled
     const topic = await pickTopic(root);
     if (!topic) return;
 
-    // Step 2: Paste LC URL
-    const url = await vscode.window.showInputBox({
-      title: 'New Problem — Step 2 of 3',
-      prompt: 'Paste LeetCode problem URL',
-      placeHolder: 'https://leetcode.com/problems/two-sum/',
-      ignoreFocusOut: true,
-      validateInput: (val) => {
-        if (!val?.trim()) return 'URL is required';
-        if (!val.includes('leetcode.com/problems/')) {
-          return 'Must be a leetcode.com/problems/... URL';
-        }
-        return null;
-      },
-    });
+    const url = await promptLeetCodeUrl();
     if (!url) return;
 
-    // Step 3: Fetch from LC GraphQL API
-    let lc;
-    await vscode.window.withProgress(
-      {
-        location: vscode.ProgressLocation.Notification,
-        title: 'DSA: Fetching from LeetCode...',
-        cancellable: false,
-      },
-      async () => {
-        lc = await fetchLeetCodeProblem(url.trim());
-      },
-    );
+    const problemData = await fetchWithProgress(url);
+    if (!problemData) return;
 
-    if (!lc) {
-      vscode.window.showErrorMessage('GrindStone: Failed to fetch problem data.');
-      return;
-    }
-
-    // Step 4: Preview + confirm
-    // topic is now correctly in scope — defined in Step 1
-    const confirmed = await previewAndConfirm(lc, topic);
+    const confirmed = await previewAndConfirm(problemData, topic);
     if (!confirmed) return;
 
-    // Step 5: Build folder path
-    const topicPath = path.join(root, topic); // topic is a string — correct
-    const numStr = await getNextProblemNumber(topicPath);
-    const folderName = buildFolderName(numStr, lc.titleSlug);
-    const problemDir = path.join(topicPath, folderName);
-
-    if (fs.existsSync(problemDir)) {
-      vscode.window.showErrorMessage(`GrindStone: Folder already exists: ${folderName}`);
+    const result = createProblem(root, topic, problemData);
+    if (!result) {
+      vscode.window.showErrorMessage('GrindStone: Folder already exists.');
       return;
     }
 
-    // Step 6: Create all files
-    // Fixed arg order: (problemDir, root, lc, numStr, topicName)
-    createProblemFiles(problemDir, root, lc, numStr, topic);
-
-    // Step 7: Update tracker + index
-    appendTrackerRow(root, topic, numStr, lc.title, lc.difficulty);
-
-    const relPath = path.relative(root, problemDir).split(path.sep).join('/');
-    onProblemCreated(root, relPath);
-
-    // Step 8: Open layout
-    await openLayout(problemDir);
-
-    vscode.window.showInformationMessage(`✓ Created: ${folderName} (LC #${lc.questionId})`);
+    await openLayout(result.problemDir);
+    vscode.window.showInformationMessage(`✓ Created: ${path.basename(result.problemDir)} (LC #${problemData.questionId})`);
   } catch (err) {
     vscode.window.showErrorMessage(`GrindStone New Problem: ${err.message}`);
     console.error('[new-problem]', err);
@@ -118,24 +60,71 @@ async function pickTopic(root) {
     placeHolder: 'Select topic folder',
   });
 
-  // Return the raw topic string, not the QuickPick item object
   return picked?.topic ?? null;
 }
 
+// Step 2 — prompt user for LeetCode URL with validation
+/**
+ * Prompt user for LeetCode problem URL with validation.
+ *
+ * @returns {Promise<string|null>}
+ */
+async function promptLeetCodeUrl() {
+  return vscode.window.showInputBox({
+    title: 'New Problem — Step 2 of 3',
+    prompt: 'Paste LeetCode problem URL',
+    placeHolder: 'https://leetcode.com/problems/two-sum/',
+    ignoreFocusOut: true,
+    validateInput: (val) => {
+      if (!val?.trim()) return 'URL is required';
+      if (!val.includes('leetcode.com/problems/')) {
+        return 'Must be a leetcode.com/problems/... URL';
+      }
+      return null;
+    },
+  });
+}
+
+// Step 3 — fetch problem data with progress indicator
+/**
+ * Fetch problem data from LeetCode with progress indicator.
+ *
+ * @param {string} url
+ * @returns {Promise<Object|null>}
+ */
+async function fetchWithProgress(url) {
+  let problemData;
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: 'DSA: Fetching from LeetCode...',
+      cancellable: false,
+    },
+    async () => {
+      problemData = await fetchLeetCodeProblem(url.trim());
+    },
+  );
+
+  if (!problemData) {
+    vscode.window.showErrorMessage('GrindStone: Failed to fetch problem data.');
+  }
+  return problemData;
+}
+
 // Step 4 — preview QuickPick before creating
-async function previewAndConfirm(lc, topic) {
-  const tags = (lc.topicTags ?? []).map((t) => t.name).join(', ') || '—';
+async function previewAndConfirm(problemData, topic) {
+  const tags = (problemData.topicTags ?? []).map((t) => t.name).join(', ') || '—';
 
   const items = [
     {
       label: '$(check)  Create this problem',
-      description: `LC #${lc.questionId} — ${lc.difficulty}`,
+      description: `LC #${problemData.questionId} — ${problemData.difficulty}`,
       detail: [
-        `Title:    ${lc.title}`,
+        `Title:    ${problemData.title}`,
         `Topic:    ${topic}`,
         `Tags:     ${tags}`,
-        `Examples: ${lc.exampleTestcases ? 'yes → input.txt' : 'none'}`,
-        `Snippets: ${(lc.codeSnippets ?? []).map((s) => s.langSlug).join(', ')}`,
+        `Examples: ${problemData.exampleTestcases ? 'yes → input.txt' : 'none'}`,
+        `Snippets: ${(problemData.codeSnippets ?? []).map((s) => s.langSlug).join(', ')}`,
       ].join('   |   '),
       action: 'confirm',
     },
@@ -154,84 +143,6 @@ async function previewAndConfirm(lc, topic) {
   });
 
   return picked?.action === 'confirm';
-}
-
-// Step 6 — create all files in problem folder
-// Args: (problemDir, root, lc, numStr, topicName)
-function createProblemFiles(problemDir, root, lc, _numStr, topicName) {
-  fs.mkdirSync(problemDir, { recursive: true });
-
-  try {
-    // PROBLEM.md — built from LC data
-    fs.writeFileSync(
-      path.join(problemDir, 'PROBLEM.md'),
-      buildProblemMd(lc, topicName),
-      'utf8',
-    );
-
-    // Fill ## Test Cases section with LC example testcases
-    if (lc.exampleTestcases) {
-      writeTestCasesToProblemMd(problemDir, lc.sampleTestCase);
-    }
-
-    // Solution files — LC snippets + header
-    fs.writeFileSync(path.join(problemDir, 'solution.py'), buildPythonSolution(lc, _numStr), 'utf8');
-    fs.writeFileSync(path.join(problemDir, 'solution.cpp'), buildCppSolution(lc, _numStr), 'utf8');
-    fs.writeFileSync(path.join(problemDir, 'solution.rs'), buildRustSolution(lc, _numStr), 'utf8');
-
-    // Sync testcases → root/input.txt immediately
-    syncTestCasesToInput(root, problemDir);
-
-    // Ensure root/output.txt exists
-    const globalOutputPath = path.join(root, 'output.txt');
-    if (!fs.existsSync(globalOutputPath)) {
-      fs.writeFileSync(globalOutputPath, '', 'utf8');
-    }
-
-    console.log(`[new-problem] created ${problemDir}`);
-  } catch (err) {
-    // Rollback: delete the half-created folder
-    try {
-      fs.rmSync(problemDir, { recursive: true, force: true });
-      console.log(`[new-problem] rolled back ${problemDir}`);
-    } catch (rollbackErr) {
-      console.error(`[new-problem] rollback failed: ${rollbackErr.message}`);
-    }
-    throw err; // Re-throw so caller can show error notification
-  }
-}
-
-// Helpers
-
-function sanitizeFolderName(slug) {
-  // Replace unsafe chars with underscore
-  const safe = slug.replace(/[^a-zA-Z0-9_-]/g, '_');
-  // Collapse multiple underscores
-  const collapsed = safe.replace(/_+/g, '_');
-  // Trim leading/trailing underscores
-  return collapsed.replace(/^_+|_+$/g, '') || 'untitled';
-}
-
-function buildFolderName(numStr, titleSlug) {
-  // LC titleSlug is kebab-case e.g. 'two-sum' → snake_case '002_two_sum'
-  const safeName = sanitizeFolderName(titleSlug.replace(/-/g, '_'));
-  return `${numStr}_${safeName}`;
-}
-
-function appendTrackerRow(root, topic, numStr, title, difficulty) {
-  const trackerPath = getTrackerPath(root);
-  if (!fs.existsSync(trackerPath)) {
-    console.warn('[new-problem] TRACKER.md not found — skipping tracker update');
-    return;
-  }
-  const snakeName = title
-    .toLowerCase()
-    .replace(/[|\\]/g, '') // remove chars that break markdown tables
-    .replace(/\s+/g, '_')
-    .replace(/[^a-z0-9_]/g, '');
-  const today = new Date().toISOString().split('T')[0];
-  const row = `| ${topic} | ${numStr} | ${snakeName} | ${difficulty} | Todo | — | ${today} |`;
-  fs.appendFileSync(trackerPath, '\n' + row, 'utf8');
 }
 
 module.exports = { cmdNewProblem };

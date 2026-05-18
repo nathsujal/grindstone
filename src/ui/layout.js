@@ -8,7 +8,7 @@ const constants = require('../constants');
 const layout = require('../constants/layout');
 const { exists, writeFile } = require('../utils/fs-utils');
 const { getWorkspaceRoot } = require('../utils/workspace');
-const { sleep, pollUntil, showDoc, waitForTab } = require('../utils/async.js');
+const { pollUntil, showDoc, waitForTab } = require('../utils/async.js');
 const { syncTestCasesToInput } = require('../utils/testcase-sync.js');
 
 /**
@@ -63,7 +63,11 @@ async function closeAllTabsHard() {
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');
   }
 
-  await sleep(layout.CLOSE_TABS_BUFFER_MS);
+  // Wait until all tabs are actually closed
+  await pollUntil(
+    () => vscode.window.tabGroups.all.every((g) => g.tabs.length === 0),
+    { interval: layout.POLL_INTERVAL_MS, timeout: 2000 },
+  );
 }
 
 /**
@@ -74,7 +78,12 @@ async function closeAllTabsHard() {
 async function clearLayout() {
   try {
     await vscode.commands.executeCommand('workbench.action.files.saveAll');
-    await sleep(layout.SAVE_ALL_BUFFER_MS);
+
+    // Wait until no dirty documents remain
+    await pollUntil(
+      () => vscode.workspace.textDocuments.every((doc) => !doc.isDirty),
+      { interval: layout.POLL_INTERVAL_MS, timeout: 3000 },
+    );
 
     await closeAllTabsHard();
 
@@ -105,7 +114,12 @@ async function clearLayout() {
         orientation: 0,
         groups: [{}],
       });
-      await sleep(layout.NUCLEAR_FALLBACK_BUFFER_MS);
+
+      // Wait until tabs are actually cleared after nuclear fallback
+      await pollUntil(
+        () => vscode.window.tabGroups.all.every((g) => g.tabs.length === 0),
+        { interval: layout.POLL_INTERVAL_MS, timeout: 2000 },
+      );
     }
   } catch (err) {
     console.error('[layout] clearLayout error:', err.message, err.stack);
@@ -199,8 +213,11 @@ async function openLayout(problemDir) {
     ],
   });
 
-  // 7. Wait until VS Code reports exactly 4 groups
-  const layoutOk = await pollUntil(() => vscode.window.tabGroups.all.length === 4, {
+  // Wait until VS Code reports exactly 4 groups AND each group is empty
+  const layoutOk = await pollUntil(() => {
+    const groups = vscode.window.tabGroups.all;
+    return groups.length === 4 && groups.every((g) => g.tabs.length === 0);
+  }, {
     interval: layout.POLL_INTERVAL_MS,
     timeout: layout.CONFIRM_LAYOUT_TIMEOUT_MS,
   });
@@ -209,10 +226,6 @@ async function openLayout(problemDir) {
     vscode.window.showErrorMessage('GrindStone: timed out waiting for layout. Try again.');
     return;
   }
-
-  // Extra buffer — VS Code sometimes hasn't finished wiring
-  // ViewColumn → group mapping even after tabGroups reports 4 groups
-  await sleep(layout.LAYOUT_CONFIRM_BUFFER_MS);
 
   // 8. Open files into their groups
 

@@ -47,6 +47,9 @@ const FILE_ICONS = {
   '.rs': '$(symbol-enum)',
 };
 
+const COMPILE_TIMEOUT_MS = 30000; // 30 seconds
+const RUN_TIMEOUT_MS = 15000;     // 15 seconds
+
 // Main command — Cmd+Shift+R
 async function cmdRunSolution() {
   try {
@@ -220,7 +223,7 @@ async function runFile(root, problemDir, fileName) {
       const buildCmd = runner.build(absFile, tmpDir);
       console.log('[run-solution] compile:', buildCmd);
 
-      const buildResult = await execCommand(buildCmd, problemDir);
+      const buildResult = await execCommand(buildCmd, problemDir, COMPILE_TIMEOUT_MS);
 
       if (buildResult.exitCode !== 0) {
         fs.writeFileSync(outputFile, `=== COMPILE ERROR ===\n\n${buildResult.stdout}\n`, 'utf8');
@@ -238,7 +241,7 @@ async function runFile(root, problemDir, fileName) {
     const runCmd = runner.run(absFile, inputFile, outputFile, tmpDir);
     console.log('[run-solution] run:', runCmd);
 
-    const runResult = await execCommand(runCmd, problemDir);
+    const runResult = await execCommand(runCmd, problemDir, RUN_TIMEOUT_MS);
 
     // 4. Reveal output.txt
     await revealOutput(outputFile);
@@ -277,15 +280,23 @@ async function revealOutput(outputFile) {
   }
 }
 
-// Shell executor — wraps child_process.exec in a Promise.
-function execCommand(cmd, cwd) {
-  return new Promise((resolve) => {
-    cp.exec(cmd, { cwd }, (err, stdout, stderr) => {
+// Shell executor — wraps child_process.exec in a Promise with timeout.
+function execCommand(cmd, cwd, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const child = cp.exec(cmd, { cwd }, (err, stdout, stderr) => {
       resolve({
         exitCode: err?.code ?? 0,
         stdout: (stdout ?? '') + (stderr ?? ''),
       });
     });
+
+    if (timeoutMs) {
+      child.on('timeout', () => {
+        child.kill();
+        reject(new Error(`Command timed out after ${timeoutMs / 1000}s: ${cmd}`));
+      });
+      child.setTimeout(timeoutMs);
+    }
   });
 }
 

@@ -2,6 +2,7 @@
 
 const vscode = require('vscode');
 const { onFileChanged, onFileDeleted } = require('./link-index');
+const { info } = require('../utils/logger');
 
 // Global debounce: single timer for ALL file changes
 // Batches multiple saves together into one reindex call
@@ -29,7 +30,7 @@ function startWatcher(root) {
     onFileDeleted(root, absPath);
   });
 
-  console.log('[index-watcher] watching *.md under', root);
+  info('index-watcher', `watching *.md under ${root}`);
   return watcher;
 }
 

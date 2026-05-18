@@ -6,6 +6,11 @@
  */
 
 const LC_GRAPHQL_URL = 'https://leetcode.com/graphql';
+const LC_FETCH_TIMEOUT_MS = 10000; // 10 seconds
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 200;
+
+const { info } = require('../utils/logger');
 
 const QUERY = `
   query questionData($titleSlug: String!) {
@@ -30,6 +35,27 @@ const QUERY = `
     }
   }
 `;
+
+async function withRetry(fn, maxRetries = MAX_RETRIES, baseDelayMs = RETRY_DELAY_MS) {
+  let lastError;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      // Don't retry on permanent errors
+      if (err.message.includes('Problem not found') || err.message.includes('Invalid LeetCode URL')) {
+        throw err;
+      }
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        info('leetcode', `retry ${attempt + 1}/${maxRetries} in ${delay}ms: ${err.message}`);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastError;
+}
 
 /**
  * Validate a LeetCode URL format.
@@ -74,41 +100,56 @@ function extractSlug(url) {
 async function fetchLeetCodeProblem(url) {
   const slug = extractSlug(url);
 
-  let response;
-  try {
-    response = await fetch(LC_GRAPHQL_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: QUERY,
-        variables: { titleSlug: slug },
-      }),
-    });
-  } catch (err) {
-    throw new Error(`Network error fetching LC problem: ${err.message}`);
-  }
+  return withRetry(async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), LC_FETCH_TIMEOUT_MS);
 
-  if (!response.ok) {
-    throw new Error(`LC API returned ${response.status}: ${response.statusText}`);
-  }
+    let response;
+    try {
+      response = await fetch(LC_GRAPHQL_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: QUERY,
+          variables: { titleSlug: slug },
+        }),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        throw new Error(`LeetCode API request timed out after ${LC_FETCH_TIMEOUT_MS / 1000}s`);
+      }
+      throw new Error(`Network error fetching LC problem: ${err.message}`);
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
-  let json;
-  try {
-    json = await response.json();
-  } catch {
-    throw new Error('LC API returned invalid JSON');
-  }
+    if (!response.ok) {
+      // Retry on 429 (rate limit) or 5xx (server error)
+      if (response.status === 429 || response.status >= 500) {
+        throw new Error(`LC API returned ${response.status} — retrying`);
+      }
+      throw new Error(`LC API returned ${response.status}: ${response.statusText}`);
+    }
 
-  if (json.errors?.length) {
-    throw new Error(`LC API error: ${json.errors[0].message}`);
-  }
+    let json;
+    try {
+      json = await response.json();
+    } catch {
+      throw new Error('LC API returned invalid JSON');
+    }
 
-  const problem = json?.data?.question;
-  if (!problem) {
-    throw new Error(`Problem not found for slug "${slug}"`);
-  }
+    if (json.errors?.length) {
+      throw new Error(`LC API error: ${json.errors[0].message}`);
+    }
 
-  return problem;
+    const problem = json?.data?.question;
+    if (!problem) {
+      throw new Error(`Problem not found for slug "${slug}"`);
+    }
+
+    return problem;
+  });
 }
 
 /**

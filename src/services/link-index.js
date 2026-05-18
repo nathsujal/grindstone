@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { LINK_INDEX_FILE, CURRENT_INDEX_VERSION, INDEX_PERSIST_DELAY } = require('../constants');
 const { scanMarkdownFiles } = require('../utils/fs-utils');
+const { info, warn, error } = require('../utils/logger');
 
 // Version registry for index migrations.
 // Each version documents its schema and optional migration function.
@@ -50,7 +51,7 @@ async function ensureIndex(root) {
   const indexPath = getIndexPath(root);
 
   if (!fs.existsSync(indexPath)) {
-    console.log('[link-index] no index found — building');
+    info('link-index', 'no index found — building');
     await _buildIndex(root);
     return;
   }
@@ -60,7 +61,7 @@ async function ensureIndex(root) {
   try {
     loaded = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
   } catch (e) {
-    console.error('[link-index] failed to parse index — rebuilding:', e.message);
+    error('link-index', 'failed to parse index — rebuilding', e);
     await _buildIndex(root);
     return;
   }
@@ -69,13 +70,13 @@ async function ensureIndex(root) {
   if (loaded.version !== CURRENT_INDEX_VERSION) {
     const migration = INDEX_VERSIONS[loaded.version]?.migration;
     if (migration) {
-      console.log(`[link-index] migrating v${loaded.version} → v${CURRENT_INDEX_VERSION}`);
+      info('link-index', `migrating v${loaded.version} → v${CURRENT_INDEX_VERSION}`);
       migration(loaded);
       _index = loaded;
       _index.version = CURRENT_INDEX_VERSION;
       persistNow(root);
     } else {
-      console.log(`[link-index] version mismatch (v${loaded.version}) — rebuilding`);
+      info('link-index', `version mismatch (v${loaded.version}) — rebuilding`);
       await _buildIndex(root);
     }
     return;
@@ -83,14 +84,14 @@ async function ensureIndex(root) {
 
   // Stale → rebuild
   if (isStaleTimestamp(root, loaded.built_at)) {
-    console.log('[link-index] stale — rebuilding');
+    info('link-index', 'stale — rebuilding');
     await _buildIndex(root);
     return;
   }
 
   // All good — load into memory
   _index = loaded;
-  console.log(`[link-index] loaded from disk (${Object.keys(_index.entries).length} entries)`);
+  info('link-index', `loaded from disk (${Object.keys(_index.entries).length} entries)`);
 }
 
 /**
@@ -101,7 +102,7 @@ async function ensureIndex(root) {
  */
 async function _buildIndex(root) {
   _root = root;
-  console.log('[link-index] building full index...');
+  info('link-index', 'building full index...');
   const start = Date.now();
 
   const entries = {};
@@ -141,9 +142,7 @@ async function _buildIndex(root) {
   _dirty = false;
   persistNow(root); // write immediately on full rebuild
 
-  console.log(
-    `[link-index] built in ${Date.now() - start}ms — ${Object.keys(entries).length} entries`,
-  );
+  info('link-index', `built in ${Date.now() - start}ms — ${Object.keys(entries).length} entries`);
 }
 
 /**
@@ -155,7 +154,7 @@ async function _buildIndex(root) {
  */
 function getReferencingFiles(root, problemRelPath) {
   if (!_index) {
-    console.warn('[link-index] getReferencingFiles called before ensureIndex');
+    warn('link-index', 'getReferencingFiles called before ensureIndex');
     return [];
   }
   const norm = problemRelPath.split(path.sep).join('/');
@@ -177,7 +176,7 @@ function onProblemCreated(root, problemRelPath) {
   if (!_index.entries[norm]) {
     _index.entries[norm] = { referenced_by: [] };
     markDirty(root);
-    console.log(`[link-index] created entry: ${norm}`);
+    info('link-index', `created entry: ${norm}`);
   }
 }
 
@@ -218,7 +217,7 @@ function onProblemRenamed(root, oldRelPath, newRelPath, renamedFiles = new Map()
   delete _index.entries[oldNorm];
 
   markDirty(root);
-  console.log(`[link-index] renamed entry: ${oldNorm} → ${newNorm}`);
+  info('link-index', `renamed entry: ${oldNorm} → ${newNorm}`);
 }
 
 /**
@@ -234,7 +233,7 @@ function onProblemDeleted(root, problemRelPath) {
   if (_index.entries[norm]) {
     delete _index.entries[norm];
     markDirty(root);
-    console.log(`[link-index] deleted entry: ${norm}`);
+    info('link-index', `deleted entry: ${norm}`);
   }
 }
 
@@ -275,7 +274,7 @@ function onFileChanged(root, absFilePath) {
   }
 
   markDirty(root);
-  console.log(`[link-index] re-indexed file: ${relFilePath}`);
+  info('link-index', `re-indexed file: ${relFilePath}`);
 }
 
 /**
@@ -295,7 +294,7 @@ function onFileDeleted(root, absFilePath) {
   }
 
   markDirty(root);
-  console.log(`[link-index] removed deleted file: ${relFilePath}`);
+  info('link-index', `removed deleted file: ${relFilePath}`);
 }
 
 /**
@@ -366,9 +365,9 @@ function persistNow(root) {
     _index.built_at = Date.now();
     fs.writeFileSync(indexPath, JSON.stringify(_index, null, 2), 'utf8');
     _dirty = false;
-    console.log('[link-index] persisted to disk');
+    info('link-index', 'persisted to disk');
   } catch (e) {
-    console.error('[link-index] failed to persist:', e.message);
+    error('link-index', 'failed to persist', e);
   }
 }
 

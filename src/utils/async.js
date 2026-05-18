@@ -59,4 +59,19 @@ async function waitForTab(uri, { timeout = 1500 } = {}) {
   );
 }
 
-module.exports = { sleep, pollUntil, showDoc, waitForTab };
+/**
+ * Wrap a promise with a timeout.
+ *
+ * @param {Promise} promise
+ * @param {number} ms
+ * @param {string} [message]
+ * @returns {Promise}
+ */
+async function withTimeout(promise, ms, message = 'Operation timed out') {
+  const timeout = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]);
+}
+
+module.exports = { sleep, pollUntil, showDoc, waitForTab, withTimeout };
