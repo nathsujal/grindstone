@@ -2,6 +2,8 @@
 
 const vscode = require('vscode');
 const path   = require('path');
+const os     = require('os');
+const crypto = require('crypto');
 const cp     = require('child_process');
 const fs     = require('fs');
 const { syncTestCasesToInput }                          = require('../utils/testcase-sync');
@@ -10,8 +12,8 @@ const { getOpenProblemDir }                             = require('../utils/tab-
 
 // Language runner config
 //
-// build(file)              → shell command to compile (null = no compile step)
-// run(file, input, output) → shell command to execute
+// build(file, tmpDir)          → shell command to compile (null = no compile step)
+// run(file, input, output, tmpDir) → shell command to execute
 //
 // Both pipe stdin from input.txt and stdout+stderr to output.txt.
 // 2>&1 merges stderr into stdout so compile errors appear in output.txt.
@@ -24,17 +26,17 @@ const RUNNERS = {
   },
   '.cpp': {
     label: 'C++ — solution.cpp',
-    build: (file) =>
-      `g++ -std=c++17 -O2 -Wall "${file}" -o /tmp/dsa_sol_cpp 2>&1`,
-    run:   (_file, inputFile, outputFile) =>
-      `/tmp/dsa_sol_cpp < "${inputFile}" > "${outputFile}" 2>&1`,
+    build: (file, tmpDir) =>
+      `g++ -std=c++17 -O2 -Wall "${file}" -o "${path.join(tmpDir, 'sol_cpp')}" 2>&1`,
+    run:   (_file, inputFile, outputFile, tmpDir) =>
+      `"${path.join(tmpDir, 'sol_cpp')}" < "${inputFile}" > "${outputFile}" 2>&1`,
   },
   '.rs': {
     label: 'Rust — solution.rs',
-    build: (file) =>
-      `rustc "${file}" -o /tmp/dsa_sol_rs 2>&1`,
-    run:   (_file, inputFile, outputFile) =>
-      `/tmp/dsa_sol_rs < "${inputFile}" > "${outputFile}" 2>&1`,
+    build: (file, tmpDir) =>
+      `rustc "${file}" -o "${path.join(tmpDir, 'sol_rs')}" 2>&1`,
+    run:   (_file, inputFile, outputFile, tmpDir) =>
+      `"${path.join(tmpDir, 'sol_rs')}" < "${inputFile}" > "${outputFile}" 2>&1`,
   },
 };
 
@@ -74,7 +76,7 @@ async function cmdRunSolution() {
     await runFile(root, problemDir, solutionFile);
 
   } catch (err) {
-    vscode.window.showErrorMessage(`DSA Run: ${err.message}`);
+    vscode.window.showErrorMessage(`GrindStone Run: ${err.message}`);
     console.error('[run-solution]', err);
   }
 }
@@ -85,7 +87,7 @@ async function pickProblemDir(root) {
   // Step 1 of 3 — topic
   const topics = discoverTopics(root);
   if (topics.length === 0) {
-    vscode.window.showErrorMessage('DSA Run: No topics found.');
+    vscode.window.showErrorMessage('GrindStone Run: No topics found.');
     return null;
   }
 
@@ -107,7 +109,7 @@ async function pickProblemDir(root) {
 
   if (problems.length === 0) {
     vscode.window.showErrorMessage(
-      `DSA Run: No problems found in ${pickedTopic.topic}`
+      `GrindStone Run: No problems found in ${pickedTopic.topic}`
     );
     return null;
   }
@@ -137,7 +139,7 @@ async function pickSolutionFile(problemDir) {
 
   if (existing.length === 0) {
     vscode.window.showErrorMessage(
-      `DSA Run: No solution files found in ${path.basename(problemDir)}`
+      `GrindStone Run: No solution files found in ${path.basename(problemDir)}`
     );
     return null;
   }
@@ -175,7 +177,7 @@ async function runFile(root, problemDir, fileName) {
 
   if (!runner) {
     vscode.window.showErrorMessage(
-      `DSA Run: No runner configured for "${ext}" files`
+      `GrindStone Run: No runner configured for "${ext}" files`
     );
     return;
   }
@@ -184,6 +186,11 @@ async function runFile(root, problemDir, fileName) {
   const absFile    = path.join(problemDir, fileName);
   const inputFile  = path.join(root, 'input.txt');
   const outputFile = path.join(root, 'output.txt');
+
+  // Workspace-specific temp dir to avoid conflicts between workspaces
+  const workspaceHash = crypto.createHash('md5').update(root).digest('hex').slice(0, 8);
+  const tmpDir = path.join(os.tmpdir(), `grindstone-${workspaceHash}`);
+  fs.mkdirSync(tmpDir, { recursive: true });
 
   // Ensure input.txt exists (may be empty if no test cases)
   if (!fs.existsSync(inputFile)) fs.writeFileSync(inputFile, '', 'utf8');
@@ -200,7 +207,7 @@ async function runFile(root, problemDir, fileName) {
   try {
     // 2. Compile step (C++ and Rust only)
     if (runner.build) {
-      const buildCmd = runner.build(absFile);
+      const buildCmd = runner.build(absFile, tmpDir);
       console.log('[run-solution] compile:', buildCmd);
 
       const buildResult = await execCommand(buildCmd, problemDir);
@@ -213,7 +220,7 @@ async function runFile(root, problemDir, fileName) {
         );
         await revealOutput(outputFile);
         vscode.window.showErrorMessage(
-          `DSA Run: ${fileName} — compile failed. See output.txt`
+          `GrindStone Run: ${fileName} — compile failed. See output.txt`
         );
         return;
       }
@@ -222,7 +229,7 @@ async function runFile(root, problemDir, fileName) {
     }
 
     // 3. Run step
-    const runCmd = runner.run(absFile, inputFile, outputFile);
+    const runCmd = runner.run(absFile, inputFile, outputFile, tmpDir);
     console.log('[run-solution] run:', runCmd);
 
     const runResult = await execCommand(runCmd, problemDir);
@@ -233,16 +240,22 @@ async function runFile(root, problemDir, fileName) {
     // 5. Notification
     if (runResult.exitCode !== 0) {
       vscode.window.showWarningMessage(
-        `DSA Run: ${fileName} exited with code ${runResult.exitCode} — check output.txt`
+        `GrindStone Run: ${fileName} exited with code ${runResult.exitCode} — check output.txt`
       );
     } else {
       vscode.window.showInformationMessage(
-        `DSA Run: ${fileName} ✓ — output written to output.txt`
+        `GrindStone Run: ${fileName} ✓ — output written to output.txt`
       );
     }
 
   } finally {
     statusItem.dispose();
+    // Clean up workspace-specific temp dir
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch (e) {
+      console.error('[run-solution] temp cleanup failed:', e.message);
+    }
   }
 }
 

@@ -280,7 +280,7 @@ async function cmdDeleteProblem() {
 
     vscode.window.showInformationMessage(`✓ Deleted: ${isWholeTopic ? pickedTopic.label : pickedOption.value}`);
   } catch (err) {
-    vscode.window.showErrorMessage(`DSA Layout error: ${err.message}`);
+    vscode.window.showErrorMessage(`GrindStone error: ${err.message}`);
     console.error('[delete-problem] error:', err.message, err.stack);
   }
 }

@@ -60,7 +60,7 @@ async function cmdNewProblem() {
     );
 
     if (!lc) {
-      vscode.window.showErrorMessage('DSA: Failed to fetch problem data.');
+      vscode.window.showErrorMessage('GrindStone: Failed to fetch problem data.');
       return;
     }
 
@@ -76,7 +76,7 @@ async function cmdNewProblem() {
     const problemDir = path.join(topicPath, folderName);
 
     if (fs.existsSync(problemDir)) {
-      vscode.window.showErrorMessage(`DSA: Folder already exists: ${folderName}`);
+      vscode.window.showErrorMessage(`GrindStone: Folder already exists: ${folderName}`);
       return;
     }
 
@@ -98,7 +98,7 @@ async function cmdNewProblem() {
     );
 
   } catch (err) {
-    vscode.window.showErrorMessage(`DSA New Problem: ${err.message}`);
+    vscode.window.showErrorMessage(`GrindStone New Problem: ${err.message}`);
     console.error('[new-problem]', err);
   }
 }
@@ -110,7 +110,7 @@ async function cmdNewProblem() {
 async function pickTopic(root) {
   const topics = discoverTopics(root);
   if (topics.length === 0) {
-    vscode.window.showErrorMessage('DSA: No topic folders found.');
+    vscode.window.showErrorMessage('GrindStone: No topic folders found.');
     return null;
   }
 
@@ -230,10 +230,19 @@ async function getNextNumber(topicPath) {
   }
 }
 
+function sanitizeFolderName(slug) {
+  // Replace unsafe chars with underscore
+  const safe = slug.replace(/[^a-zA-Z0-9_-]/g, '_');
+  // Collapse multiple underscores
+  const collapsed = safe.replace(/_+/g, '_');
+  // Trim leading/trailing underscores
+  return collapsed.replace(/^_+|_+$/g, '') || 'untitled';
+}
+
 function buildFolderName(numStr, titleSlug) {
   // LC titleSlug is kebab-case e.g. 'two-sum' → snake_case '002_two_sum'
-  const snakeName = titleSlug.replace(/-/g, '_');
-  return `${numStr}_${snakeName}`;
+  const safeName = sanitizeFolderName(titleSlug.replace(/-/g, '_'));
+  return `${numStr}_${safeName}`;
 }
 
 function appendTrackerRow(root, topic, numStr, title, difficulty) {
@@ -242,7 +251,11 @@ function appendTrackerRow(root, topic, numStr, title, difficulty) {
     console.warn('[new-problem] TRACKER.md not found — skipping tracker update');
     return;
   }
-  const snakeName = title.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+  const snakeName = title
+    .toLowerCase()
+    .replace(/[|\\]/g, '')        // remove chars that break markdown tables
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_]/g, '');
   const today     = new Date().toISOString().split('T')[0];
   const row       = `| ${topic} | ${numStr} | ${snakeName} | ${difficulty} | Todo | — | ${today} |`;
   fs.appendFileSync(trackerPath, '\n' + row, 'utf8');

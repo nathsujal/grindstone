@@ -19,7 +19,7 @@ async function cmdOpenProblem() {
 
     await openLayout(picked.fullPath);
   } catch (err) {
-    vscode.window.showErrorMessage(`DSA Layout error: ${err.message}`);
+    vscode.window.showErrorMessage(`GrindStone error: ${err.message}`);
     console.error('[problem-picker] error:', err.message, err.stack);
   }
 }
@@ -28,7 +28,7 @@ async function cmdOpenProblem() {
 async function cmdOpenProblemPath(problemPath) {
   try {
     if (!problemPath) {
-      vscode.window.showErrorMessage('DSA Layout: no path provided.');
+      vscode.window.showErrorMessage('GrindStone: no path provided.');
       return;
     }
     const root = getWorkspaceRoot();
@@ -36,7 +36,7 @@ async function cmdOpenProblemPath(problemPath) {
 
     const resolved = path.isAbsolute(problemPath) ? problemPath : path.join(root, problemPath);
     if (!exists(resolved) || !isDir(resolved)) {
-      vscode.window.showErrorMessage(`DSA Layout: Invalid path "${problemPath}"`);
+      vscode.window.showErrorMessage(`GrindStone: Invalid path "${problemPath}"`);
       return;
     }
 
@@ -45,14 +45,14 @@ async function cmdOpenProblemPath(problemPath) {
     const parts = rel.split(path.sep);
     if (parts.length !== 2 || !/^\d+_/.test(parts[1])) {
       vscode.window.showErrorMessage(
-        `DSA Layout: "${path.basename(resolved)}" is not a problem folder. Select a folder like 01_Arrays/001_two_sum.`
+        `GrindStone: "${path.basename(resolved)}" is not a problem folder. Select a folder like 01_Arrays/001_two_sum.`
       );
       return;
     }
 
     await openLayout(resolved);
   } catch (err) {
-    vscode.window.showErrorMessage(`DSA Layout error: ${err.message}`);
+    vscode.window.showErrorMessage(`GrindStone error: ${err.message}`);
     console.error('[problem-picker] error:', err.message, err.stack);
   }
 }

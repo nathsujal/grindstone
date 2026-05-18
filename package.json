@@ -5,7 +5,8 @@
   "version": "2.0.0",
   "publisher": "sujalnath",
   "engines": {
-    "vscode": "^1.74.0"
+    "vscode": "^1.74.0",
+    "node": ">=18.0.0"
   },
   "categories": [
     "Other"
@@ -43,6 +44,10 @@
       {
         "command": "grindstone.runSolution",
         "title": "DSA: Run Solution"
+      },
+      {
+        "command": "grindstone.showIndexStats",
+        "title": "DSA: Show Index Stats"
       }
     ],
     "keybindings": [
@@ -81,9 +86,5 @@
         }
       ]
     }
-  },
-  "dependencies": {
-    "node-fetch": "^3.3.2",
-    "turndown": "^7.2.4"
   }
 }

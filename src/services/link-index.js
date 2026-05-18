@@ -5,6 +5,16 @@ const path = require('path');
 const { LINK_INDEX_FILE, CURRENT_INDEX_VERSION, INDEX_PERSIST_DELAY } = require('../constants');
 const { scanMarkdownFiles } = require('../utils/fs-utils');
 
+// Version registry for index migrations.
+// Each version documents its schema and optional migration function.
+// When a future version introduces a breaking change, add a migration here.
+const INDEX_VERSIONS = {
+  1: {
+    description: 'Initial version — problem to referenced_by mapping',
+    migration: null,
+  },
+};
+
 // In-memory state
 // Single instance per extension lifetime.
 // Shape:
@@ -55,10 +65,19 @@ async function ensureIndex(root) {
     return;
   }
 
-  // Version mismatch → rebuild
+  // Version mismatch → check for migration, else rebuild
   if (loaded.version !== CURRENT_INDEX_VERSION) {
-    console.log('[link-index] version mismatch — rebuilding');
-    await _buildIndex(root);
+    const migration = INDEX_VERSIONS[loaded.version]?.migration;
+    if (migration) {
+      console.log(`[link-index] migrating v${loaded.version} → v${CURRENT_INDEX_VERSION}`);
+      migration(loaded);
+      _index = loaded;
+      _index.version = CURRENT_INDEX_VERSION;
+      persistNow(root);
+    } else {
+      console.log(`[link-index] version mismatch (v${loaded.version}) — rebuilding`);
+      await _buildIndex(root);
+    }
     return;
   }
 
@@ -457,6 +476,32 @@ function discoverAllProblemDirs(root) {
   return results;
 }
 
+/**
+ * Get current index statistics for diagnostics.
+ *
+ * @param {string} root
+ * @returns {{ entryCount: number, builtAt: string, version: number, isDirty: boolean, staleness: string } | { status: string }}
+ */
+function getIndexStats(root) {
+  if (!_index) {
+    return { status: 'not initialized' };
+  }
+
+  const age = Date.now() - _index.built_at;
+  let staleness;
+  if (age < 60000) staleness = 'fresh (< 1 min)';
+  else if (age < 3600000) staleness = `ok (${Math.floor(age / 60000)} min ago)`;
+  else staleness = `stale (${Math.floor(age / 3600000)} hr ago)`;
+
+  return {
+    entryCount: Object.keys(_index.entries).length,
+    builtAt: new Date(_index.built_at).toISOString(),
+    version: _index.version,
+    isDirty: _dirty,
+    staleness,
+  };
+}
+
 module.exports = {
   ensureIndex,
   getReferencingFiles,
@@ -466,4 +511,5 @@ module.exports = {
   onFileChanged,
   onFileDeleted,
   flushIndex,
+  getIndexStats,
 };

@@ -9,7 +9,7 @@ const { exists, isDir, readFile } = require('./fs-utils');
 function getWorkspaceRoot() {
   const wf = vscode.workspace.workspaceFolders;
   if (!wf || wf.length === 0) {
-    vscode.window.showErrorMessage('DSA Layout: No workspace open. Open via dsa.code-workspace.');
+    vscode.window.showErrorMessage('GrindStone: No workspace open. Open via dsa.code-workspace.');
     return null;
   }
   return wf[0].uri.fsPath;
@@ -24,7 +24,7 @@ function discoverTopics(root) {
   try {
     const dirs = fs.readdirSync(root).filter(d => !shouldSkip(d)).filter(d => isDir(path.join(root, d)));
     topics.push(...dirs.sort());
-  } catch (e) { vscode.window.showErrorMessage(`DSA Layout: Cannot read workspace: ${e.message}`); }
+  } catch (e) { vscode.window.showErrorMessage(`GrindStone: Cannot read workspace: ${e.message}`); }
   return topics;
 }
 
@@ -66,7 +66,9 @@ function scanProblems(root) {
         items.push({ label: `$(file-directory)  ${prob}`, description: topic, fullPath: path.join(topicPath, prob) });
       }
     }
-  } catch (e) { vscode.window.showErrorMessage(`DSA Layout: Cannot read workspace: ${e.message}`); }
+  } catch (e) { 
+    vscode.window.showErrorMessage(`GrindStone: Cannot read workspace: ${e.message}`);
+  }
   return items;
 }
 

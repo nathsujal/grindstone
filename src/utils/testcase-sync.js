@@ -1,19 +1,21 @@
 'use strict';
 
+// @ts-check
+
 const fs = require('fs');
 const path = require('path');
 
 /**
  * Read the ## Test Cases section from PROBLEM.md and write
  * all testcases to the global root/input.txt.
- * 
+ *
  * Called on:
- *      - layout open (openLayout)
- *      - layout solution (runSolution)
- * 
- * @param {string} root             absolute workspace root (DSA/)
- * @param {string} problemDir       absolute path to current problem directory
- * @param {boolean}                 true if input.txt was updated, false if no testcases found  
+ *   - layout open (openLayout)
+ *   - layout solution (runSolution)
+ *
+ * @param {string} root - Absolute workspace root path
+ * @param {string} problemDir - Absolute path to problem directory
+ * @returns {boolean} True if input.txt was updated, false if no testcases found
  */
 function syncTestCasesToInput(root, problemDir) {
   const problemMdPath = path.join(problemDir, 'PROBLEM.md');

@@ -1,12 +1,24 @@
 'use strict';
 
+// @ts-check
+
 const vscode    = require('vscode');
 const path      = require('path');
 const constants = require('../constants');
 const { exists, writeFile }          = require('../utils/fs-utils');
 const { getWorkspaceRoot }           = require('../utils/workspace');
-const { sleep, pollUntil, showDoc }  = require('../utils/async.js');
+const { sleep, pollUntil, showDoc, waitForTab }  = require('../utils/async.js');
 const { syncTestCasesToInput }       = require('../utils/testcase-sync.js');
+
+/**
+ * @typedef {Object} LayoutFiles
+ * @property {string} problem - PROBLEM.md path
+ * @property {string} py - solution.py path
+ * @property {string} cpp - solution.cpp path
+ * @property {string} rs - solution.rs path
+ * @property {string} input - root/input.txt path
+ * @property {string} output - root/output.txt path
+ */
 
 /**
  * Validate that a path is a valid problem folder.
@@ -30,9 +42,12 @@ function isValidProblemDir(problemDir, root) {
   return true;
 }
 
-// closeAllTabsHard
-// Close every open tab using the TabGroups API.
-// Falls back to workbench command if tabGroups.close throws.
+/**
+ * Close every open tab using the TabGroups API.
+ * Falls back to workbench command if tabGroups.close throws.
+ *
+ * @returns {Promise<void>}
+ */
 async function closeAllTabsHard() {
   const groups = [...vscode.window.tabGroups.all];
   if (groups.length === 0) return;
@@ -51,8 +66,11 @@ async function closeAllTabsHard() {
 }
 
 
-// clearLayout
-// Save all files, close all tabs, collapse to a single empty group.
+/**
+ * Save all files, close all tabs, collapse to a single empty group.
+ *
+ * @returns {Promise<void>}
+ */
 async function clearLayout() {
   try {
     await vscode.commands.executeCommand('workbench.action.files.saveAll');
@@ -94,34 +112,19 @@ async function clearLayout() {
   }
 }
 
-// openLayout
-//
-// Opens the 4-pane DSA workbench for a given problem folder.
-//
-// TARGET LAYOUT:
-//
-//  ┌──────────────────────┬───────────────────────────────────┐
-//  │                      │  [solution.py][.cpp][.rs] ← tabs  │
-//  │     PROBLEM.md       │                                   │
-//  │     (Col 1 top)      │     active solution file          │
-//  │                      │     (Col 4)                       │
-//  ├───────────┬──────────┤                                   │
-//  │ input.txt │output.txt│                                   │
-//  │ (Col 2)   │ (Col 3)  │                                   │
-//  └───────────┴──────────┴───────────────────────────────────┘
-//
-//  input.txt + output.txt live at DSA/ root (global, shared).
-//  Test cases are synced from PROBLEM.md → input.txt on every open.
-//
-// @param {string} problemDir  absolute path to problem folder
-//
+/**
+ * Opens the 4-pane DSA workbench for a given problem folder.
+ *
+ * @param {string} problemDir - Absolute path to problem folder
+ * @returns {Promise<void>}
+ */
 async function openLayout(problemDir) {
   const root = getWorkspaceRoot();
   if (!root) return;
 
   if (!isValidProblemDir(problemDir, root)) {
     vscode.window.showErrorMessage(
-      `DSA Layout: Invalid problem directory "${path.basename(problemDir)}". Must be a problem folder (e.g. 01_Arrays/001_two_sum).`
+      `GrindStone: Invalid problem directory "${path.basename(problemDir)}". Must be a problem folder (e.g. 01_Arrays/001_two_sum).`
     );
     return;
   }
@@ -148,7 +151,7 @@ async function openLayout(problemDir) {
         writeFile(filePath, '');
       } catch (e) {
         vscode.window.showErrorMessage(
-          `DSA Layout: cannot create ${path.basename(filePath)}: ${e.message}`
+          `GrindStone: cannot create ${path.basename(filePath)}: ${e.message}`
         );
         // Don't abort — missing solution file is non-fatal
       }
@@ -204,43 +207,45 @@ async function openLayout(problemDir) {
 
   if (!layoutOk) {
     vscode.window.showErrorMessage(
-      'DSA Layout: timed out waiting for layout. Try again.'
+      'GrindStone: timed out waiting for layout. Try again.'
     );
     return;
   }
 
   // Extra buffer — VS Code sometimes hasn't finished wiring
   // ViewColumn → group mapping even after tabGroups reports 4 groups
-  await sleep(150);
+  await sleep(50);
 
   // 8. Open files into their groups
 
   // Col 1 (top-left) — PROBLEM.md
   await showDoc(uri.problem, vscode.ViewColumn.One);
-  await sleep(80);
+  await waitForTab(uri.problem, { timeout: 1500 });
 
   // Col 2 (bottom-left) — input.txt
   await showDoc(uri.input, vscode.ViewColumn.Two);
-  await sleep(80);
+  await waitForTab(uri.input, { timeout: 1500 });
 
   // Col 3 (bottom-right) — output.txt
   await showDoc(uri.output, vscode.ViewColumn.Three);
-  await sleep(80);
+  await waitForTab(uri.output, { timeout: 1500 });
 
   // Col 4 (right, full height) — solution files as tabs
   // Open cpp + rs first so py ends up as the active (frontmost) tab
   await showDoc(uri.cpp, vscode.ViewColumn.Four);
-  await sleep(60);
+  await waitForTab(uri.cpp, { timeout: 1000 });
+
   await showDoc(uri.rs,  vscode.ViewColumn.Four);
-  await sleep(60);
+  await waitForTab(uri.rs, { timeout: 1000 });
+
   await showDoc(uri.py,  vscode.ViewColumn.Four);  // ← active tab
-  await sleep(80);
+  await waitForTab(uri.py, { timeout: 1000 });
 
   // 9. Return focus to PROBLEM.md
   await showDoc(uri.problem, vscode.ViewColumn.One);
 
   vscode.window.showInformationMessage(
-    `✓ DSA Layout: ${path.basename(problemDir)}`
+    `✓ GrindStone: ${path.basename(problemDir)}`
   );
 }
 

@@ -1,17 +1,32 @@
 'use strict';
 
+// @ts-check
+
 const fs = require('fs');
 const vscode = require('vscode');
 const path = require('path');
 const constants = require('../constants');
 const { readFile, writeFile, exists } = require('./fs-utils');
 
-// get tracker path
+/**
+ * Get the absolute path to TRACKER.md.
+ *
+ * @param {string} root - Absolute workspace root path
+ * @returns {string}
+ */
 function getTrackerPath(root) {
   return path.join(root, constants.FOLDER_PROGRESS, constants.FILE_TRACKER);
 }
 
-// append new problem row to tracker
+/**
+ * Append a new problem row to TRACKER.md.
+ *
+ * @param {string} root - Absolute workspace root path
+ * @param {string} topic - Topic folder name (e.g. '01_Arrays')
+ * @param {string} number - Problem number (e.g. '001')
+ * @param {string} name - Problem name slug (e.g. 'two_sum')
+ * @returns {Promise<void>}
+ */
 async function updateTracker(root, topic, number, name) {
   const trackerPath = getTrackerPath(root);
   if (!exists(trackerPath)) {
@@ -25,7 +40,14 @@ async function updateTracker(root, topic, number, name) {
   } catch (err) { console.error('[tracker] failed to update TRACKER.md:', err.message); }
 }
 
-// strike single problem row in tracker
+/**
+ * Strike through a single problem row in TRACKER.md.
+ *
+ * @param {string} trackerPath - Absolute path to TRACKER.md
+ * @param {string} topicName - Topic folder name
+ * @param {string} problemNum - Problem number (zero-padded, e.g. '001')
+ * @returns {void}
+ */
 function strikeTrackerRow(trackerPath, topicName, problemNum) {
   if (!exists(trackerPath)) { console.log('[tracker] TRACKER.md not found, skipping strikethrough'); return; }
 
@@ -53,7 +75,13 @@ function strikeTrackerRow(trackerPath, topicName, problemNum) {
   writeFile(trackerPath, updated.join('\n'));
 }
 
-// strike all rows for a topic
+/**
+ * Strike through all rows for a topic in TRACKER.md.
+ *
+ * @param {string} trackerPath - Absolute path to TRACKER.md
+ * @param {string} topicName - Topic folder name
+ * @returns {void}
+ */
 function strikeAllTopicRows(trackerPath, topicName) {
   if (!exists(trackerPath)) { console.log('[tracker] TRACKER.md not found, skipping strikethrough'); return; }
 

@@ -5,7 +5,7 @@ const vscode = require('vscode');
 // show problem picker - returns selected item or null
 async function showProblemPicker(items) {
   if (items.length === 0) {
-    vscode.window.showErrorMessage('DSA Layout: No problem folders found.');
+    vscode.window.showErrorMessage('GrindStone: No problem folders found.');
     return null;
   }
   return vscode.window.showQuickPick(items, {
@@ -17,7 +17,7 @@ async function showProblemPicker(items) {
 // show topic picker - returns selected topic or null
 async function showTopicPicker(topics) {
   if (topics.length === 0) {
-    vscode.window.showErrorMessage('DSA Layout: No topic folders found.');
+    vscode.window.showErrorMessage('GrindStone: No topic folders found.');
     return null;
   }
   const topicPicks = topics.map(t => ({ label: t }));

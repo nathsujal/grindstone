@@ -46,7 +46,7 @@ function scanMarkdownFiles(root) {
   try {
     scan(root);
   } catch (err) {
-    vscode.window.showErrorMessage(`DSA: Cannot scan workspace for markdown files: ${err.message}`);
+    vscode.window.showErrorMessage(`GrindStone: Cannot scan workspace for markdown files: ${err.message}`);
     throw err;
   }
 

@@ -1,14 +1,13 @@
 'use strict';
 
 const vscode = require('vscode');
-const path   = require('path');
 const { onFileChanged, onFileDeleted } = require('./link-index');
 
-// Debounce map: absFilePath → timer
-// Prevents rapid-fire saves (e.g. auto-format on save) from triggering
-// multiple re-index calls for the same file
-const _pendingTimers = new Map();
-const DEBOUNCE_MS = 300;
+// Global debounce: single timer for ALL file changes
+// Batches multiple saves together into one reindex call
+const _changedFiles = new Set();
+let _batchTimer = null;
+const BATCH_DEBOUNCE_MS = 500;
 
 /**
  * Start watching all .md files under root.
@@ -18,19 +17,15 @@ const DEBOUNCE_MS = 300;
  * @returns {vscode.FileSystemWatcher}
  */
 function startWatcher(root) {
-  // Watch all .md files anywhere in workspace
   const pattern = new vscode.RelativePattern(root, '**/*.md');
-  const watcher  = vscode.workspace.createFileSystemWatcher(pattern);
+  const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
-  // File saved (created or changed)
   watcher.onDidChange(uri => scheduleReindex(root, uri.fsPath));
   watcher.onDidCreate(uri => scheduleReindex(root, uri.fsPath));
 
-  // File deleted
   watcher.onDidDelete(uri => {
     const absPath = uri.fsPath;
-    // Cancel any pending reindex for this file
-    clearPending(absPath);
+    _changedFiles.delete(absPath);  // no need to reindex deleted file
     onFileDeleted(root, absPath);
   });
 
@@ -39,28 +34,26 @@ function startWatcher(root) {
 }
 
 /**
- * Debounced reindex trigger for a single file.
- * If the same file changes multiple times within DEBOUNCE_MS,
- * only the last change triggers reindex.
+ * Batch file changes together. Single debounce timer resets on each change.
+ * When timer fires, all changed files are reindexed at once.
  *
  * @param {string} root
  * @param {string} absFilePath
  */
 function scheduleReindex(root, absFilePath) {
-  clearPending(absFilePath);
-  const timer = setTimeout(() => {
-    _pendingTimers.delete(absFilePath);
-    onFileChanged(root, absFilePath);
-  }, DEBOUNCE_MS);
-  _pendingTimers.set(absFilePath, timer);
-}
+  _changedFiles.add(absFilePath);
 
-function clearPending(absFilePath) {
-  const existing = _pendingTimers.get(absFilePath);
-  if (existing) {
-    clearTimeout(existing);
-    _pendingTimers.delete(absFilePath);
-  }
+  if (_batchTimer) clearTimeout(_batchTimer);
+
+  _batchTimer = setTimeout(() => {
+    const files = [..._changedFiles];
+    _changedFiles.clear();
+    _batchTimer = null;
+
+    for (const f of files) {
+      onFileChanged(root, f);
+    }
+  }, BATCH_DEBOUNCE_MS);
 }
 
 module.exports = { startWatcher };

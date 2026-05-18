@@ -46,6 +46,19 @@ async function activate(context) {
   register('grindstone.deleteProblem',   cmdDeleteProblem);
   register('grindstone.clearLayout',     cmdClearLayout);
   register('grindstone.runSolution',     cmdRunSolution);
+
+  // Diagnostics command — does not need ensureIndex wrapper
+  context.subscriptions.push(
+    vscode.commands.registerCommand('grindstone.showIndexStats', async () => {
+      const root = getWorkspaceRoot();
+      if (!root) return;
+      const { getIndexStats } = require('./services/link-index');
+      const stats = getIndexStats(root);
+      const lines = Object.entries(stats).map(([k, v]) => `${k}: ${v}`);
+      vscode.window.showInformationMessage(`Index Stats\n${lines.join('\n')}`);
+    })
+  );
+
   console.log('[grindstone] activated');
 }
 

@@ -7,9 +7,9 @@ const { clearLayout } = require('../ui/layout');
 async function cmdClearLayout() {
   try {
     await clearLayout();
-    vscode.window.showInformationMessage('DSA Layout: cleared');
+    vscode.window.showInformationMessage('GrindStone: cleared');
   } catch (err) {
-    vscode.window.showErrorMessage(`DSA Layout error: ${err.message}`);
+    vscode.window.showErrorMessage(`GrindStone error: ${err.message}`);
     console.error('[clear-layout] error:', err.message, err.stack);
   }
 }
