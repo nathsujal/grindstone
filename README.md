@@ -155,7 +155,7 @@ Numbering is automatic based on existing problems in the topic.
 
 | Action | macOS | Linux/Windows |
 |--------|-------|---------------|
-| Open Problem | Cmd+Shift+O | Ctrl+Shift+O |
+| Open Problem | Cmd+Alt+O | Ctrl+Alt+O |
 | New Problem | Cmd+Shift+N | Ctrl+Shift+N |
 | Delete Problem | Cmd+Shift+D | Ctrl+Shift+D |
 | Clear Layout | Cmd+Shift+C | Ctrl+Shift+C |

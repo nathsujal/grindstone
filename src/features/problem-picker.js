@@ -39,6 +39,17 @@ async function cmdOpenProblemPath(problemPath) {
       vscode.window.showErrorMessage(`DSA Layout: Invalid path "${problemPath}"`);
       return;
     }
+
+    // Validate it's actually a problem folder, not a topic or random dir
+    const rel = path.relative(root, resolved);
+    const parts = rel.split(path.sep);
+    if (parts.length !== 2 || !/^\d+_/.test(parts[1])) {
+      vscode.window.showErrorMessage(
+        `DSA Layout: "${path.basename(resolved)}" is not a problem folder. Select a folder like 01_Arrays/001_two_sum.`
+      );
+      return;
+    }
+
     await openLayout(resolved);
   } catch (err) {
     vscode.window.showErrorMessage(`DSA Layout error: ${err.message}`);

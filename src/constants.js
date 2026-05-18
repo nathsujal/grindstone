@@ -9,7 +9,7 @@ const FILE_PROBLEM = 'PROBLEM.md';
 const FILE_INPUT = 'input.txt';
 const FILE_OUTPUT = 'output.txt';
 const FILES_SOLUTIONS = ['solution.py', 'solution.cpp', 'solution.rs'];
-const LINK_INDEX_FILE = "_progress/LINK_INDEX.md";
+const LINK_INDEX_FILE = "_progress/link-index.json";
 const CURRENT_INDEX_VERSION = 1;
 const INDEX_PERSIST_DELAY   = 2000;   // ms debounce before writing to disk
 

@@ -48,8 +48,8 @@
     "keybindings": [
       {
         "command": "grindstone.openProblem",
-        "key": "ctrl+shift+o",
-        "mac": "cmd+shift+o"
+        "key": "ctrl+alt+o",
+        "mac": "cmd+alt+o"
       },
       {
         "command": "grindstone.clearLayout",

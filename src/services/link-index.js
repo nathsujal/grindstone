@@ -41,7 +41,7 @@ async function ensureIndex(root) {
 
   if (!fs.existsSync(indexPath)) {
     console.log('[link-index] no index found — building');
-    await buildIndex(root);
+    await _buildIndex(root);
     return;
   }
 
@@ -51,21 +51,21 @@ async function ensureIndex(root) {
     loaded = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
   } catch (e) {
     console.error('[link-index] failed to parse index — rebuilding:', e.message);
-    await buildIndex(root);
+    await _buildIndex(root);
     return;
   }
 
   // Version mismatch → rebuild
   if (loaded.version !== CURRENT_INDEX_VERSION) {
     console.log('[link-index] version mismatch — rebuilding');
-    await buildIndex(root);
+    await _buildIndex(root);
     return;
   }
 
   // Stale → rebuild
   if (isStaleTimestamp(root, loaded.built_at)) {
     console.log('[link-index] stale — rebuilding');
-    await buildIndex(root);
+    await _buildIndex(root);
     return;
   }
 
@@ -80,7 +80,7 @@ async function ensureIndex(root) {
  *
  * @param {string} root
  */
-async function buildIndex(root) {
+async function _buildIndex(root) {
   _root = root;
   console.log('[link-index] building full index...');
   const start = Date.now();
@@ -282,8 +282,12 @@ function onFileDeleted(root, absFilePath) {
  * Call from extension deactivate() to guarantee no data loss.
  */
 function flushIndex() {
-  if (_dirty && _root) {
-    clearTimeout(_timer);
+  if (!_root) return;
+  // Clear timer unconditionally — prevents leak if persistNow ran
+  // from the timer callback just before this flushIndex call.
+  clearTimeout(_timer);
+  _timer = null;
+  if (_dirty) {
     persistNow(_root);
   }
 }
@@ -291,7 +295,6 @@ function flushIndex() {
 // Internal helpers
 
 function getIndexPath(root) {
-  const { LINK_INDEX_FILE } = require('../constants');
   return path.join(root, LINK_INDEX_FILE);
 }
 
@@ -456,7 +459,6 @@ function discoverAllProblemDirs(root) {
 
 module.exports = {
   ensureIndex,
-  buildIndex,
   getReferencingFiles,
   onProblemCreated,
   onProblemRenamed,

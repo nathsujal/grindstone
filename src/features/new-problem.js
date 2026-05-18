@@ -172,33 +172,44 @@ async function previewAndConfirm(lc, topic) {
 function createProblemFiles(problemDir, root, lc, numStr, topicName) {
   fs.mkdirSync(problemDir, { recursive: true });
 
-  // PROBLEM.md — built from LC data
-  fs.writeFileSync(
-    path.join(problemDir, 'PROBLEM.md'),
-    buildProblemMd(lc, numStr, topicName),
-    'utf8'
-  );
+  try {
+    // PROBLEM.md — built from LC data
+    fs.writeFileSync(
+      path.join(problemDir, 'PROBLEM.md'),
+      buildProblemMd(lc, numStr, topicName),
+      'utf8'
+    );
 
-  // Fill ## Test Cases section with LC example testcases
-  if (lc.exampleTestcases) {
-    writeTestCasesToProblemMd(problemDir, lc.sampleTestCase);
+    // Fill ## Test Cases section with LC example testcases
+    if (lc.exampleTestcases) {
+      writeTestCasesToProblemMd(problemDir, lc.sampleTestCase);
+    }
+
+    // Solution files — LC snippets + header
+    fs.writeFileSync(path.join(problemDir, 'solution.py'),  buildPythonSolution(lc, numStr), 'utf8');
+    fs.writeFileSync(path.join(problemDir, 'solution.cpp'), buildCppSolution(lc, numStr),    'utf8');
+    fs.writeFileSync(path.join(problemDir, 'solution.rs'),  buildRustSolution(lc, numStr),   'utf8');
+
+    // Sync testcases → root/input.txt immediately
+    syncTestCasesToInput(root, problemDir);
+
+    // Ensure root/output.txt exists
+    const globalOutputPath = path.join(root, 'output.txt');
+    if (!fs.existsSync(globalOutputPath)) {
+      fs.writeFileSync(globalOutputPath, '', 'utf8');
+    }
+
+    console.log(`[new-problem] created ${problemDir}`);
+  } catch (err) {
+    // Rollback: delete the half-created folder
+    try {
+      fs.rmSync(problemDir, { recursive: true, force: true });
+      console.log(`[new-problem] rolled back ${problemDir}`);
+    } catch (rollbackErr) {
+      console.error(`[new-problem] rollback failed: ${rollbackErr.message}`);
+    }
+    throw err;  // Re-throw so caller can show error notification
   }
-
-  // Solution files — LC snippets + header
-  fs.writeFileSync(path.join(problemDir, 'solution.py'),  buildPythonSolution(lc, numStr), 'utf8');
-  fs.writeFileSync(path.join(problemDir, 'solution.cpp'), buildCppSolution(lc, numStr),    'utf8');
-  fs.writeFileSync(path.join(problemDir, 'solution.rs'),  buildRustSolution(lc, numStr),   'utf8');
-
-  // Sync testcases → root/input.txt immediately
-  syncTestCasesToInput(root, problemDir);
-
-  // Ensure root/output.txt exists
-  const globalOutputPath = path.join(root, 'output.txt');
-  if (!fs.existsSync(globalOutputPath)) {
-    fs.writeFileSync(globalOutputPath, '', 'utf8');
-  }
-
-  console.log(`[new-problem] created ${problemDir}`);
 }
 
 // ─────────────────────────────────────────────────────────────────

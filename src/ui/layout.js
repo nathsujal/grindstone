@@ -8,6 +8,27 @@ const { getWorkspaceRoot }           = require('../utils/workspace');
 const { sleep, pollUntil, showDoc }  = require('../utils/async.js');
 const { syncTestCasesToInput }       = require('../utils/testcase-sync.js');
 
+/**
+ * Validate that a path is a valid problem folder.
+ * Must be: root/topic/NNN_name/ (last segment starts with digits + underscore)
+ *
+ * @param {string} problemDir  absolute path
+ * @param {string} root        absolute workspace root
+ * @returns {boolean}
+ */
+function isValidProblemDir(problemDir, root) {
+  if (!problemDir || !root) return false;
+  const rel = path.relative(root, problemDir);
+  if (rel.startsWith('..')) return false;
+  const parts = rel.split(path.sep);
+  // Must be exactly 2 levels: topic/problem
+  if (parts.length !== 2) return false;
+  // Topic must not be a special folder
+  if (parts[0].startsWith('_') || parts[0].startsWith('.')) return false;
+  // Problem folder must start with digits (e.g. 001_two_sum)
+  if (!/^\d+_/.test(parts[1])) return false;
+  return true;
+}
 
 // closeAllTabsHard
 // Close every open tab using the TabGroups API.
@@ -97,6 +118,13 @@ async function clearLayout() {
 async function openLayout(problemDir) {
   const root = getWorkspaceRoot();
   if (!root) return;
+
+  if (!isValidProblemDir(problemDir, root)) {
+    vscode.window.showErrorMessage(
+      `DSA Layout: Invalid problem directory "${path.basename(problemDir)}". Must be a problem folder (e.g. 01_Arrays/001_two_sum).`
+    );
+    return;
+  }
 
   // 1. Sync test cases → global input.txt
   // Reads ## Test Cases section from PROBLEM.md, overwrites root/input.txt

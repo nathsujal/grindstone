@@ -6,6 +6,7 @@ const cp     = require('child_process');
 const fs     = require('fs');
 const { syncTestCasesToInput }                          = require('../utils/testcase-sync');
 const { getWorkspaceRoot, discoverTopics, scanProblemsInTopic } = require('../utils/workspace');
+const { getOpenProblemDir }                             = require('../utils/tab-utils');
 
 // Language runner config
 //
@@ -51,7 +52,7 @@ async function cmdRunSolution() {
     const root = getWorkspaceRoot();
     if (!root) return;
 
-    // Detect whether a problem is already open in the layout─
+    // Detect whether a problem is already open in the layout
     const openProblemDir = getOpenProblemDir(root);
 
     let problemDir;
@@ -76,32 +77,6 @@ async function cmdRunSolution() {
     vscode.window.showErrorMessage(`DSA Run: ${err.message}`);
     console.error('[run-solution]', err);
   }
-}
-
-// Detect open problem dir from current tab groups.
-// Looks for any open tab whose path is: root/topic/problem/file
-// Returns the absolute problem folder path, or null.
-function getOpenProblemDir(root) {
-  const openTabPaths = vscode.window.tabGroups.all
-    .flatMap(g => g.tabs)
-    .map(t => t?.input?.uri?.fsPath)
-    .filter(Boolean);
-
-  for (const tabPath of openTabPaths) {
-    const rel = path.relative(root, tabPath);
-    if (rel.startsWith('..')) continue;
-
-    const parts = rel.split(path.sep);
-    // Needs at least: topic / problem / file  (3 parts)
-    if (parts.length < 3) continue;
-    // Skip _progress, _templates, .vscode etc
-    if (parts[0].startsWith('_') || parts[0].startsWith('.')) continue;
-    // Problem folder must start with digits e.g. 001_two_sum
-    if (!/^\d+_/.test(parts[1])) continue;
-
-    return path.join(root, parts[0], parts[1]);
-  }
-  return null;
 }
 
 // Flow B — 2-step picker: topic → problem
@@ -206,7 +181,7 @@ async function runFile(root, problemDir, fileName) {
   }
 
   // Resolve paths
-  const absFile    = path.join(problemDir, fileName);   // ← was missing/undefined before
+  const absFile    = path.join(problemDir, fileName);
   const inputFile  = path.join(root, 'input.txt');
   const outputFile = path.join(root, 'output.txt');
 
@@ -225,26 +200,22 @@ async function runFile(root, problemDir, fileName) {
   try {
     // 2. Compile step (C++ and Rust only)
     if (runner.build) {
-      const buildCmd = runner.build(absFile);   // ← fixed: was runner.buildCmd
+      const buildCmd = runner.build(absFile);
       console.log('[run-solution] compile:', buildCmd);
 
       const buildResult = await execCommand(buildCmd, problemDir);
 
       if (buildResult.exitCode !== 0) {
-        // Write compile errors to output.txt — visible in layout Col 3
         fs.writeFileSync(
           outputFile,
           `=== COMPILE ERROR ===\n\n${buildResult.stdout}\n`,
           'utf8'
         );
-
-        // Reveal output.txt (already open in Col 3, just focus it)
         await revealOutput(outputFile);
-
         vscode.window.showErrorMessage(
           `DSA Run: ${fileName} — compile failed. See output.txt`
         );
-        return;   // don't attempt to run
+        return;
       }
 
       console.log('[run-solution] compile OK');
@@ -259,7 +230,7 @@ async function runFile(root, problemDir, fileName) {
     // 4. Reveal output.txt
     await revealOutput(outputFile);
 
-    // 5. Notification─
+    // 5. Notification
     if (runResult.exitCode !== 0) {
       vscode.window.showWarningMessage(
         `DSA Run: ${fileName} exited with code ${runResult.exitCode} — check output.txt`
@@ -271,13 +242,11 @@ async function runFile(root, problemDir, fileName) {
     }
 
   } finally {
-    // Always dispose spinner regardless of success/failure
     statusItem.dispose();
   }
 }
 
-// Reveal output.txt in Col 3 without stealing focus from the
-// solution file the user is editing.
+// Reveal output.txt in Col 3 without stealing focus from the solution file.
 async function revealOutput(outputFile) {
   try {
     await vscode.window.showTextDocument(
@@ -285,7 +254,7 @@ async function revealOutput(outputFile) {
       {
         viewColumn:    vscode.ViewColumn.Three,
         preview:       false,
-        preserveFocus: true,   // keep cursor in solution file
+        preserveFocus: true,
       }
     );
   } catch (e) {
@@ -294,8 +263,6 @@ async function revealOutput(outputFile) {
 }
 
 // Shell executor — wraps child_process.exec in a Promise.
-// Merges stdout + stderr so all output ends up in one place.
-// Returns { exitCode, stdout }.
 function execCommand(cmd, cwd) {
   return new Promise(resolve => {
     cp.exec(cmd, { cwd }, (err, stdout, stderr) => {
