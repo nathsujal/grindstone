@@ -117,15 +117,9 @@ async function previewAndConfirm(problemData, topic) {
 
   const items = [
     {
-      label: '$(check)  Create this problem',
-      description: `LC #${problemData.questionId} — ${problemData.difficulty}`,
-      detail: [
-        `Title:    ${problemData.title}`,
-        `Topic:    ${topic}`,
-        `Tags:     ${tags}`,
-        `Examples: ${problemData.exampleTestcases ? 'yes → input.txt' : 'none'}`,
-        `Snippets: ${(problemData.codeSnippets ?? []).map((s) => s.langSlug).join(', ')}`,
-      ].join('   |   '),
+      label: `$(check)  Create — ${problemData.title}`,
+      description: `LC #${problemData.questionId}  ·  ${problemData.difficulty}  ·  ${topic}`,
+      detail: `Tags: ${tags}`,
       action: 'confirm',
     },
     {

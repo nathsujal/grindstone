@@ -20,7 +20,9 @@ function buildProblemMd(lc, topicName) {
 
   const hintsSection = hints.length > 0
     ? '## Hints\n\n' +
-      hints.map((h, i) => `<details>\n<summary>Hint ${i + 1}</summary>\n\n${h}\n\n</details>`).join('\n\n')
+      hints.map((h, i) =>
+        `<details>\n<summary>Hint ${i + 1}</summary>\n\n${stripHtml(h)}\n\n</details>`  // 4. FIX
+      ).join('\n\n')
     : '';
 
   const testCasesSection = '## Test Cases\n\n<!-- filled automatically from LC examples -->\n';
@@ -44,43 +46,11 @@ ${content}
 ---
 
 ${testCasesSection}
----
-
-## Approach 1 — [Name]
-
-**Idea:**
-
-**Time complexity:** O(?)
-**Space complexity:** O(?)
 
 ---
 
-## Approach 2 — [Name] *(if applicable)*
+${hintsSection ? '\n---\n\n## Hints\n\n' + hintsSection + '\n\n---' : '---'}
 
-**Idea:**
-
-**Time complexity:** O(?)
-**Space complexity:** O(?)
-
----
-
-## Mistakes I Made
-
-- [ ] 
-
----
-
-## Key Insight / What I Learned
-
-${hintsSection ? '\n---\n\n' + hintsSection : ''}
-
----
-
-## Languages Solved
-
-- [ ] Python
-- [ ] Rust
-- [ ] C++
 `;
 }
 
@@ -94,9 +64,8 @@ ${hintsSection ? '\n---\n\n' + hintsSection : ''}
  */
 function buildPythonSolution(lc, _numStr) {
   const snippet = getSnippet(lc.codeSnippets, 'python3');
-  const header  = buildHeader(lc);
 
-  return header + '\n' + (snippet ?? 'class Solution:\n    pass\n');
+  return (snippet ?? 'class Solution:\n    pass\n');
 }
 
 /**
@@ -108,13 +77,12 @@ function buildPythonSolution(lc, _numStr) {
  */
 function buildCppSolution(lc, _numStr) {
   const snippet = getSnippet(lc.codeSnippets, 'cpp');
-  const header  = buildHeader(lc);
 
   const boilerplate = snippet
     ? `#include <bits/stdc++.h>\nusing namespace std;\n\n${snippet}`
     : '#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    \n};\n\nint main() {\n    ios_base::sync_with_stdio(false);\n    cin.tie(NULL);\n    return 0;\n}\n';
 
-  return header + '\n' + boilerplate;
+  return boilerplate;
 }
 
 /**
@@ -127,9 +95,8 @@ function buildCppSolution(lc, _numStr) {
  */
 function buildRustSolution(lc, _numStr) {
   const snippet = getSnippet(lc.codeSnippets, 'rust');
-  const header  = buildHeader(lc);
 
-  return header + '\n' + (snippet ?? 'fn main() {\n    \n}\n');
+  return (snippet ?? 'fn main() {\n    \n}\n');
 }
 
 /**
@@ -140,26 +107,11 @@ function buildRustSolution(lc, _numStr) {
  * @returns {string}
  */
 function buildInputTxt(lc) {
-  // Prefer exampleTestcases (multiple), fall back to sampleTestCase (single)
-  const raw = lc.exampleTestcases ?? lc.sampleTestCase ?? '';
+  const raw = lc.sampleTestCase ?? '';
   return raw.trim() + '\n';
 }
 
 // Internal helpers
-
-function buildHeader(lc) {
-  return `\
-// ============================================================
-// Problem   : ${lc.title} — LeetCode #${lc.questionId}
-// Link      : https://leetcode.com/problems/${lc.titleSlug}/
-// Difficulty: ${lc.difficulty}
-// Date      : ${today()}
-// Approach  : 
-// Time      : O(?)
-// Space     : O(?)
-// ============================================================
-`;
-}
 
 function today() {
   return new Date().toISOString().split('T')[0];

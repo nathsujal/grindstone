@@ -58,7 +58,7 @@ function scanProblemsInTopic(topicPath) {
 }
 
 // get next problem number for a topic
-async function getNextProblemNumber(topicPath) {
+function getNextProblemNumber(topicPath) {
   try {
     const dirs = fs.readdirSync(topicPath).filter((d) => isDir(path.join(topicPath, d)));
     const nums = dirs.map((d) => parseInt(d.split('_')[0], 10)).filter((n) => !isNaN(n));

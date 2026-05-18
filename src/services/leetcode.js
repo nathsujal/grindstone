@@ -11,6 +11,7 @@ const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 200;
 
 const { info } = require('../utils/logger');
+const { parse } = require('node-html-parser');
 
 const QUERY = `
   query questionData($titleSlug: String!) {
@@ -152,52 +153,75 @@ async function fetchLeetCodeProblem(url) {
   });
 }
 
-/**
- * Strip HTML tags from LC content field.
- * LC returns content as HTML — we want plain text for PROBLEM.md.
- *
- * Handles:
- *   <p>, <strong>, <em>, <code>, <pre>, <ul>, <li>, <sup>, <sub>
- *   HTML entities: &lt; &gt; &amp; &nbsp; &#39;
- *
- * @param {string} html
- * @returns {string} plain text
- */
-function stripHtml(html) {
-  if (!html) return '';
+function toSuperscript(text) {
+  const map = {
+    '0':'⁰','1':'¹','2':'²','3':'³','4':'⁴',
+    '5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹',
+    '+':'⁺','-':'⁻','n':'ⁿ'
+  };
+  return text.split('').map(c => map[c] ?? c).join('');
+}
 
-  return (
-    html
-      // Block elements → newlines before stripping
-      .replace(/<\/p>/gi, '\n')
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/li>/gi, '\n')
-      .replace(/<li>/gi, '- ')
-      .replace(/<\/pre>/gi, '\n')
-      .replace(/<pre>/gi, '\n```\n')
-      // Code blocks
-      .replace(/<code>/gi, '`')
-      .replace(/<\/code>/gi, '`')
-      // Bold / italic → keep text
-      .replace(/<\/?strong>/gi, '**')
-      .replace(/<\/?em>/gi, '_')
-      // Superscript
-      .replace(/<sup>/gi, '^')
-      .replace(/<\/sup>/gi, '')
-      // Strip all remaining tags
-      .replace(/<[^>]+>/g, '')
-      // HTML entities
+function toBlockquote(inner) {
+  const lines = inner.trim().split('\n').map(l => `> ${l}`).join('\n');
+  return '\n' + lines + '\n';
+}
+
+function walkNode(node) {
+  // Text node — emit as-is
+  if (node.nodeType === 3) {
+    return node.rawText
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&amp;/g, '&')
       .replace(/&nbsp;/g, ' ')
       .replace(/&#39;/g, "'")
-      .replace(/&quot;/g, '"')
-      // Collapse 3+ newlines to 2
-      .replace(/\n{3,}/g, '\n\n')
-      .trim()
-  );
+      .replace(/&quot;/g, '"');
+  }
+
+  const tag = node.tagName?.toLowerCase();
+  const children = node.childNodes.map(walkNode).join('');
+
+  switch (tag) {
+    case 'strong': {
+      const trimmed = children.trim();
+      const trailingSpace = children.endsWith(' ') ? ' ' : '';
+      console.log('STRONG node:', JSON.stringify({ children, trimmed, trailingSpace }));
+      return `**${trimmed}**${trailingSpace}`;
+    };
+    case 'em':     return `_${children.trim()}_`;
+    case 'code':   return `\`${children}\``;
+    case 'sup':    return toSuperscript(children);
+    case 'sub':    return children;
+    case 'p':      return `${children}\n`;
+    case 'br':     return '\n';
+    case 'li':     return `\n- ${children.trim()}`;
+    case 'ul':
+    case 'ol':     return `${children}\n`;
+    case 'pre':    return toBlockquote(children);
+    default:       return children;
+  }
 }
+
+/**
+ * Convert LeetCode HTML content to clean Markdown.
+ * Uses a proper HTML tree walk instead of regex chaining,
+ * so tag context (open/close, nesting) is never ambiguous.
+ *
+ * @param {string} html - Raw HTML from LeetCode `content` field.
+ * @returns {string} Clean Markdown string.
+ */
+function stripHtml(html) {
+  if (!html) return '';
+  const root = parse(html);
+
+  return root.childNodes
+    .map(walkNode)
+    .join('')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 
 /**
  * Find a code snippet by langSlug.
