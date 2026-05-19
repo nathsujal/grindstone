@@ -237,18 +237,19 @@ async function openLayout(problemDir) {
   // Col 1 (top-left) — PROBLEM.md
   if (openAsPreview) {
     try {
+      // Open text editor first so it exists as a tab
+      await showDoc(uri.problem, vscode.ViewColumn.One);
+      await waitForTab(uri.problem, { timeout: layout.TAB_WAIT_TIMEOUT_PROBLEM_MS });
+      // Open preview on top — it becomes the active tab, text editor goes behind
       await vscode.commands.executeCommand('markdown.showPreview', uri.problem, {
         viewColumn: vscode.ViewColumn.One,
         preserveFocus: false,
       });
-      // Preview is a webview — command resolution is the confirmation.
-      // No tab polling needed (webview URIs don't match file URIs).
     } catch (err) {
       vscode.window.showWarningMessage(
         `GrindStone: Markdown preview failed (${err.message}), falling back to text editor.`,
       );
-      await showDoc(uri.problem, vscode.ViewColumn.One);
-      await waitForTab(uri.problem, { timeout: layout.TAB_WAIT_TIMEOUT_PROBLEM_MS });
+      // Text editor is already open from showDoc above — no fallback needed
     }
   } else {
     await showDoc(uri.problem, vscode.ViewColumn.One);
@@ -273,17 +274,6 @@ async function openLayout(problemDir) {
 
   await showDoc(uri.py, vscode.ViewColumn.Four); // ← active tab
   await waitForTab(uri.py, { timeout: layout.TAB_WAIT_TIMEOUT_SOLUTION_MS });
-
-  // 9. Return focus to PROBLEM.md (or preload text editor behind preview)
-  if (openAsPreview) {
-    await vscode.window.showTextDocument(uri.problem, {
-      viewColumn: vscode.ViewColumn.One,
-      preview: false,
-      preserveFocus: true,
-    });
-  } else {
-    await showDoc(uri.problem, vscode.ViewColumn.One);
-  }
 
   vscode.window.showInformationMessage(`✓ GrindStone: ${path.basename(problemDir)}`);
 }
