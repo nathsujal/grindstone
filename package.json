@@ -87,6 +87,16 @@
           "group": "navigation"
         }
       ]
+    },
+    "configuration": {
+      "title": "GrindStone",
+      "properties": {
+        "grindstone.openProblemAsPreview": {
+          "type": "boolean",
+          "default": false,
+          "description": "Open PROBLEM.md as a rendered Markdown Preview instead of a text editor."
+        }
+      }
     }
   },
   "scripts": {

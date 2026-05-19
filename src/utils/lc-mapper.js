@@ -30,12 +30,12 @@ function buildProblemMd(lc, topicName) {
   return `\
 # ${title}
 
-**Link:** ${lcUrl}
-**Topic:** ${topicName}
-**Category:** ${category}
-**Difficulty:** ${difficulty}
-**Tags:** ${tags}
-**Date first attempted:** ${today()}
+- **Link:** ${lcUrl}
+- **Topic:** ${topicName}
+- **Category:** ${category}
+- **Difficulty:** ${difficulty}
+- **Tags:** ${tags}
+- **Date first attempted:** ${today()}
 
 ---
 

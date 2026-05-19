@@ -6,61 +6,44 @@ const {
   getWorkspaceRoot,
   discoverTopics,
   scanProblemsInTopic,
-  parseProblemNumber,
 } = require('../utils/workspace');
-const { rmDir, rename, cleanupMarkdownReferences } = require('../utils/fs-utils');
-const { getTrackerPath, strikeTrackerRow, strikeAllTopicRows } = require('../utils/tracker');
+const { rmDir, rename } = require('../utils/fs-utils');
 const { showTopicPicker, showDeletePicker, confirmDelete } = require('../ui/picker');
 const { clearLayout, openLayout } = require('../ui/layout');
-const {
-  onProblemRenamed,
-  onProblemDeleted,
-  getReferencingFiles,
-} = require('../services/link-index');
-const { updateLinksAcrossWorkspace, updateTrackerRow } = require('../utils/md-updater');
 const { getOpenProblemDir } = require('../utils/tab-utils');
 
 // delete single problem + renumber remaining
 async function deleteSingleProblem(root, topicName, topicPath, problemName) {
   const problemPath = path.join(topicPath, problemName);
-  const deletedNum = parseProblemNumber(problemName);
 
   // 1: Snapshot open problem dir BEFORE any changes
   const openProblemDir = getOpenProblemDir(root);
 
-  // 2: Remove from index + delete folder
-  removeFromIndexAndDelete(root, problemPath);
+  // 2: Delete folder
+  rmDir(problemPath);
 
   // 3: Renumber remaining problems
-  const renameMap = await renumberProblems(root, topicPath, topicName);
+  const renameMap = await renumberProblems(topicPath);
 
-  // 4: Strike tracker row + cleanup markdown references
-  strikeTrackerAndCleanup(root, topicName, problemName, deletedNum);
-
-  // 5: Reopen layout if the open problem was renamed or deleted
-  await reopenLayoutAfterDelete(root, openProblemDir, problemPath, renameMap, problemName);
+  // 4: Reopen layout if the open problem was renamed or deleted
+  await reopenLayoutAfterDelete(openProblemDir, problemPath, renameMap, problemName);
 
   if (scanProblemsInTopic(topicPath).length === 0) {
     vscode.window.showWarningMessage(`Topic '${topicName}' is now empty.`);
   }
 }
 
-function removeFromIndexAndDelete(root, problemPath) {
-  onProblemDeleted(root, path.relative(root, problemPath).split(path.sep).join('/'));
-  rmDir(problemPath);
-}
-
-async function renumberProblems(root, topicPath, topicName) {
+async function renumberProblems(topicPath) {
   const remaining = scanProblemsInTopic(topicPath);
   let counter = 1;
   const renameMap = new Map();
 
   for (const prob of remaining) {
-    const oldNum = parseProblemNumber(prob);
+    const oldNum = parseInt(prob.split('_')[0], 10);
     const newNumStr = String(counter).padStart(3, '0');
 
     if (oldNum !== counter) {
-      const renamed = await renameProblem(root, topicPath, prob, newNumStr, topicName);
+      const renamed = await renameProblem(topicPath, prob, newNumStr);
       if (renamed) {
         renameMap.set(renamed.oldPath, renamed.newPath);
       } else {
@@ -73,31 +56,13 @@ async function renumberProblems(root, topicPath, topicName) {
   return renameMap;
 }
 
-async function renameProblem(root, topicPath, prob, newNumStr, topicName) {
+async function renameProblem(topicPath, prob, newNumStr) {
   const oldPath = path.join(topicPath, prob);
   const newName = prob.replace(/^\d+_/, newNumStr + '_');
   const newPath = path.join(topicPath, newName);
 
   try {
     rename(oldPath, newPath);
-    const probNameOnly = prob.replace(/^\d+_/, '');
-
-    // Fix all markdown links in workspace pointing to old path
-    const oldRelPath = path.relative(root, oldPath).split(path.sep).join('/');
-    const referencingFiles = getReferencingFiles(root, oldRelPath);
-    updateLinksAcrossWorkspace(
-      root,
-      oldPath,
-      newPath,
-      referencingFiles.length > 0 ? referencingFiles.map((f) => path.join(root, f)) : null,
-    );
-
-    // Fix number cell in TRACKER.md row
-    updateTrackerRow(getTrackerPath(root), topicName, probNameOnly, newNumStr);
-
-    // Update in-memory index
-    onProblemRenamed(root, oldRelPath, path.relative(root, newPath).split(path.sep).join('/'));
-
     return { oldPath, newPath };
   } catch (err) {
     vscode.window.showErrorMessage(`Failed to rename '${prob}' to '${newName}': ${err.message}`);
@@ -106,15 +71,7 @@ async function renameProblem(root, topicPath, prob, newNumStr, topicName) {
   }
 }
 
-function strikeTrackerAndCleanup(root, topicName, problemName, deletedNum) {
-  if (deletedNum) {
-    const trackerPath = getTrackerPath(root);
-    strikeTrackerRow(trackerPath, topicName, String(deletedNum).padStart(3, '0'));
-  }
-  cleanupMarkdownReferences(root, topicName, problemName);
-}
-
-async function reopenLayoutAfterDelete(root, openProblemDir, problemPath, renameMap, problemName) {
+async function reopenLayoutAfterDelete(openProblemDir, problemPath, renameMap, problemName) {
   if (!openProblemDir) return;
 
   const wasDeleted = openProblemDir === problemPath;
@@ -139,18 +96,14 @@ async function deleteWholeTopic(root, topicName, topicPath) {
     ? openProblemDir.startsWith(topicPath + path.sep) || openProblemDir === topicPath
     : false;
 
-  // 2: Remove all problems from index + delete folder
-  removeAllFromIndexAndDelete(root, topicPath);
+  // 2: Delete topic folder
+  rmDir(topicPath);
 
   // 3: Renumber remaining topics
   const renameMap = await renumberTopics(root);
 
-  // 4: Strike tracker + cleanup markdown
-  strikeAllTrackerAndCleanup(root, topicName);
-
-  // 5: Reopen layout if affected topic was open
+  // 4: Reopen layout if affected topic was open
   await reopenLayoutAfterTopicDelete(
-    root,
     openProblemDir,
     openIsInsideDeletedTopic,
     topicName,
@@ -160,15 +113,6 @@ async function deleteWholeTopic(root, topicName, topicPath) {
   if (discoverTopics(root).length === 0) {
     vscode.window.showWarningMessage('Workspace has no topics remaining.');
   }
-}
-
-function removeAllFromIndexAndDelete(root, topicPath) {
-  const problemsInTopic = scanProblemsInTopic(topicPath);
-  for (const prob of problemsInTopic) {
-    const relProbPath = path.relative(root, path.join(topicPath, prob)).split(path.sep).join('/');
-    onProblemDeleted(root, relProbPath);
-  }
-  rmDir(topicPath);
 }
 
 async function renumberTopics(root) {
@@ -202,16 +146,6 @@ async function renameTopic(root, topic, newPrefix) {
 
   try {
     rename(oldPath, newPath);
-    updateLinksAcrossWorkspace(root, oldPath, newPath, null);
-
-    // Update index entries for every problem inside this renamed topic
-    const problemsInRenamed = scanProblemsInTopic(newPath);
-    for (const prob of problemsInRenamed) {
-      const oldProbRel = path.relative(root, path.join(oldPath, prob)).split(path.sep).join('/');
-      const newProbRel = path.relative(root, path.join(newPath, prob)).split(path.sep).join('/');
-      onProblemRenamed(root, oldProbRel, newProbRel);
-    }
-
     return { oldPath, newPath };
   } catch (err) {
     vscode.window.showErrorMessage(`Failed to rename topic '${topic}': ${err.message}`);
@@ -220,13 +154,7 @@ async function renameTopic(root, topic, newPrefix) {
   }
 }
 
-function strikeAllTrackerAndCleanup(root, topicName) {
-  strikeAllTopicRows(getTrackerPath(root), topicName);
-  cleanupMarkdownReferences(root, topicName, null);
-}
-
 async function reopenLayoutAfterTopicDelete(
-  root,
   openProblemDir,
   openIsInsideDeletedTopic,
   topicName,

@@ -2,8 +2,6 @@
 
 const vscode = require('vscode');
 const { getWorkspaceRoot } = require('./utils/workspace');
-const { ensureIndex, flushIndex } = require('./services/link-index');
-const { startWatcher } = require('./services/index-watcher');
 const { info } = require('./utils/logger');
 const { getLastOpenedProblem, getProblemCount } = require('./utils/state');
 
@@ -19,8 +17,6 @@ const { getLastOpenedProblem, getProblemCount } = require('./utils/state');
 function registerLazy(id, modulePath, exportName, context) {
   context.subscriptions.push(
     vscode.commands.registerCommand(id, async (...args) => {
-      const root = getWorkspaceRoot();
-      if (root) await ensureIndex(root);
       const mod = require(modulePath);
       return mod[exportName](...args);
     }),
@@ -30,16 +26,9 @@ function registerLazy(id, modulePath, exportName, context) {
 async function activate(context) {
   info('grindstone', 'activating');
 
-  // Boot index — eager because index freshness matters before any command runs
+  // Restore persistent state
   const root = getWorkspaceRoot();
   if (root) {
-    await ensureIndex(root);
-
-    // Start file watcher — auto-disposed when extension deactivates
-    const watcher = startWatcher(root);
-    context.subscriptions.push(watcher);
-
-    // Restore persistent state
     const lastProblem = getLastOpenedProblem(context.workspaceState);
     if (lastProblem) {
       info('grindstone', `last opened: ${lastProblem}`);
@@ -60,24 +49,10 @@ async function activate(context) {
   registerLazy('grindstone.clearLayout', './features/clear-layout', 'cmdClearLayout', context);
   registerLazy('grindstone.runSolution', './features/run-solution', 'cmdRunSolution', context);
 
-  // Diagnostics command — does not need ensureIndex wrapper
-  context.subscriptions.push(
-    vscode.commands.registerCommand('grindstone.showIndexStats', async () => {
-      const root = getWorkspaceRoot();
-      if (!root) return;
-      const { getIndexStats } = require('./services/link-index');
-      const stats = getIndexStats(root);
-      const lines = Object.entries(stats).map(([k, v]) => `${k}: ${v}`);
-      vscode.window.showInformationMessage(`Index Stats\n${lines.join('\n')}`);
-    }),
-  );
-
   info('grindstone', 'activated');
 }
 
 function deactivate() {
-  // Guaranteed flush — writes any dirty index before extension unloads
-  flushIndex();
   info('grindstone', 'deactivated');
 }
 

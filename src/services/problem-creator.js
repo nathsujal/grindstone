@@ -4,8 +4,6 @@ const fs = require('fs');
 const path = require('path');
 const { getNextProblemNumber } = require('../utils/workspace');
 const { writeTestCasesToProblemMd, syncTestCasesToInput } = require('../utils/testcase-sync');
-const { getTrackerPath } = require('../utils/tracker');
-const { onProblemCreated } = require('../services/link-index');
 const {
   buildProblemMd,
   buildPythonSolution,
@@ -73,13 +71,6 @@ function createProblem(root, topic, problemData) {
     throw err;
   }
 
-  // Update tracker
-  appendTrackerRow(root, topic, numStr, problemData.title, problemData.difficulty);
-
-  // Update index
-  const relPath = path.relative(root, problemDir).split(path.sep).join('/');
-  onProblemCreated(root, relPath);
-
   return { problemDir, numStr };
 }
 
@@ -105,31 +96,6 @@ function sanitizeFolderName(slug) {
 function buildFolderName(numStr, titleSlug) {
   const safeName = sanitizeFolderName(titleSlug.replace(/-/g, '_'));
   return `${numStr}_${safeName}`;
-}
-
-/**
- * Append a row to TRACKER.md for the new problem.
- *
- * @param {string} root
- * @param {string} topic
- * @param {string} numStr
- * @param {string} title
- * @param {string} difficulty
- */
-function appendTrackerRow(root, topic, numStr, title, difficulty) {
-  const trackerPath = getTrackerPath(root);
-  if (!fs.existsSync(trackerPath)) {
-    console.warn('[problem-creator] TRACKER.md not found — skipping tracker update');
-    return;
-  }
-  const snakeName = title
-    .toLowerCase()
-    .replace(/[|\\]/g, '')
-    .replace(/\s+/g, '_')
-    .replace(/[^a-z0-9_]/g, '');
-  const today = new Date().toISOString().split('T')[0];
-  const row = `| ${topic} | ${numStr} | ${snakeName} | ${difficulty} | Todo | — | ${today} |`;
-  fs.appendFileSync(trackerPath, '\n' + row, 'utf8');
 }
 
 module.exports = { createProblem, buildFolderName, sanitizeFolderName };

@@ -28,4 +28,5 @@ module.exports = {
   TAB_WAIT_TIMEOUT_INPUT_MS: 1500,
   TAB_WAIT_TIMEOUT_OUTPUT_MS: 1500,
   TAB_WAIT_TIMEOUT_SOLUTION_MS: 1000,
+  TAB_WAIT_TIMEOUT_PREVIEW_MS: 2500,  // preview webview takes longer to initialize
 };
