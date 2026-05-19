@@ -216,7 +216,7 @@ async function cmdDeleteProblem() {
       `✓ Deleted: ${isWholeTopic ? pickedTopic.label : pickedOption.value}`,
     );
   } catch (err) {
-    vscode.window.showErrorMessage(`GrindStone error: ${err.message}`);
+    vscode.window.showErrorMessage(`Grindstone error: ${err.message}`);
     console.error('[delete-problem] error:', err.message, err.stack);
   }
 }

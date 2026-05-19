@@ -2,14 +2,38 @@
   "name": "grindstone",
   "displayName": "Grindstone",
   "description": "Persistent DSA workstation layout manager for VS Code",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "publisher": "sujalnath",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.74.0",
     "node": ">=18.0.0"
   },
   "categories": [
+    "Programming Languages",
     "Other"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sujalnath/grindstone"
+  },
+  "bugs": {
+    "url": "https://github.com/sujalnath/grindstone/issues"
+  },
+  "homepage": "https://github.com/sujalnath/grindstone/blob/main/README.md",
+  "license": "SEE LICENSE IN LICENSE",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "keywords": [
+    "dsa",
+    "leetcode",
+    "competitive-programming",
+    "data-structures",
+    "algorithms",
+    "problem-solving",
+    "coding-interview"
   ],
   "activationEvents": [
     "onCommand:grindstone.openProblem",
@@ -17,8 +41,7 @@
     "onCommand:grindstone.clearLayout",
     "onCommand:grindstone.newProblem",
     "onCommand:grindstone.deleteProblem",
-    "onCommand:grindstone.runSolution",
-    "onCommand:grindstone.showIndexStats"
+    "onCommand:grindstone.runSolution"
   ],
   "main": "./src/extension.js",
   "contributes": {
@@ -46,10 +69,6 @@
       {
         "command": "grindstone.runSolution",
         "title": "DSA: Run Solution"
-      },
-      {
-        "command": "grindstone.showIndexStats",
-        "title": "DSA: Show Index Stats"
       }
     ],
     "keybindings": [
@@ -89,7 +108,7 @@
       ]
     },
     "configuration": {
-      "title": "GrindStone",
+      "title": "Grindstone",
       "properties": {
         "grindstone.openProblemAsPreview": {
           "type": "boolean",

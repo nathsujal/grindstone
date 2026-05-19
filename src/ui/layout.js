@@ -138,7 +138,7 @@ async function openLayout(problemDir) {
 
   if (!isValidProblemDir(problemDir, root)) {
     vscode.window.showErrorMessage(
-      `GrindStone: Invalid problem directory "${path.basename(problemDir)}". Must be a problem folder (e.g. 01_Arrays/001_two_sum).`,
+      `Grindstone: Invalid problem directory "${path.basename(problemDir)}". Must be a problem folder (e.g. 01_Arrays/001_two_sum).`,
     );
     return;
   }
@@ -165,7 +165,7 @@ async function openLayout(problemDir) {
         writeFile(filePath, '');
       } catch (e) {
         vscode.window.showErrorMessage(
-          `GrindStone: cannot create ${path.basename(filePath)}: ${e.message}`,
+          `Grindstone: cannot create ${path.basename(filePath)}: ${e.message}`,
         );
         // Don't abort — missing solution file is non-fatal
       }
@@ -223,7 +223,7 @@ async function openLayout(problemDir) {
   });
 
   if (!layoutOk) {
-    vscode.window.showErrorMessage('GrindStone: timed out waiting for layout. Try again.');
+    vscode.window.showErrorMessage('Grindstone: timed out waiting for layout. Try again.');
     return;
   }
 
@@ -247,7 +247,7 @@ async function openLayout(problemDir) {
       });
     } catch (err) {
       vscode.window.showWarningMessage(
-        `GrindStone: Markdown preview failed (${err.message}), falling back to text editor.`,
+        `Grindstone: Markdown preview failed (${err.message}), falling back to text editor.`,
       );
       // Text editor is already open from showDoc above — no fallback needed
     }
@@ -275,7 +275,7 @@ async function openLayout(problemDir) {
   await showDoc(uri.py, vscode.ViewColumn.Four); // ← active tab
   await waitForTab(uri.py, { timeout: layout.TAB_WAIT_TIMEOUT_SOLUTION_MS });
 
-  vscode.window.showInformationMessage(`✓ GrindStone: ${path.basename(problemDir)}`);
+  vscode.window.showInformationMessage(`✓ Grindstone: ${path.basename(problemDir)}`);
 }
 
 module.exports = { clearLayout, openLayout, closeAllTabsHard };

@@ -77,7 +77,7 @@ async function cmdRunSolution() {
     // Run
     await runFile(root, problemDir, solutionFile);
   } catch (err) {
-    vscode.window.showErrorMessage(`GrindStone Run: ${err.message}`);
+    vscode.window.showErrorMessage(`Grindstone Run: ${err.message}`);
     console.error('[run-solution]', err);
   }
 }
@@ -88,7 +88,7 @@ async function pickProblemDir(root) {
   // Step 1 of 3 — topic
   const topics = discoverTopics(root);
   if (topics.length === 0) {
-    vscode.window.showErrorMessage('GrindStone Run: No topics found.');
+    vscode.window.showErrorMessage('Grindstone Run: No topics found.');
     return null;
   }
 
@@ -109,7 +109,7 @@ async function pickProblemDir(root) {
   const problems = scanProblemsInTopic(topicPath);
 
   if (problems.length === 0) {
-    vscode.window.showErrorMessage(`GrindStone Run: No problems found in ${pickedTopic.topic}`);
+    vscode.window.showErrorMessage(`Grindstone Run: No problems found in ${pickedTopic.topic}`);
     return null;
   }
 
@@ -136,7 +136,7 @@ async function pickSolutionFile(problemDir) {
 
   if (existing.length === 0) {
     vscode.window.showErrorMessage(
-      `GrindStone Run: No solution files found in ${path.basename(problemDir)}`,
+      `Grindstone Run: No solution files found in ${path.basename(problemDir)}`,
     );
     return null;
   }
@@ -173,7 +173,7 @@ async function runFile(root, problemDir, fileName) {
   const runner = RUNNERS[ext];
 
   if (!runner) {
-    vscode.window.showErrorMessage(`GrindStone Run: No runner configured for "${ext}" files`);
+    vscode.window.showErrorMessage(`Grindstone Run: No runner configured for "${ext}" files`);
     return;
   }
 
@@ -229,7 +229,7 @@ async function runFile(root, problemDir, fileName) {
         fs.writeFileSync(outputFile, `=== COMPILE ERROR ===\n\n${buildResult.stdout}\n`, 'utf8');
         await revealOutput(outputFile);
         vscode.window.showErrorMessage(
-          `GrindStone Run: ${fileName} — compile failed. See output.txt`,
+          `Grindstone Run: ${fileName} — compile failed. See output.txt`,
         );
         return;
       }
@@ -249,11 +249,11 @@ async function runFile(root, problemDir, fileName) {
     // 5. Notification
     if (runResult.exitCode !== 0) {
       vscode.window.showWarningMessage(
-        `GrindStone Run: ${fileName} exited with code ${runResult.exitCode} — check output.txt`,
+        `Grindstone Run: ${fileName} exited with code ${runResult.exitCode} — check output.txt`,
       );
     } else {
       vscode.window.showInformationMessage(
-        `GrindStone Run: ${fileName} ✓ — output written to output.txt`,
+        `Grindstone Run: ${fileName} ✓ — output written to output.txt`,
       );
     }
   } finally {

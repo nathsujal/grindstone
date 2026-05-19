@@ -162,11 +162,6 @@ function toSuperscript(text) {
   return text.split('').map(c => map[c] ?? c).join('');
 }
 
-function toBlockquote(inner) {
-  const lines = inner.trim().split('\n').map(l => `> ${l}`).join('\n');
-  return '\n' + lines + '\n';
-}
-
 function walkNode(node) {
   // Text node — emit as-is
   if (node.nodeType === 3) {
@@ -186,7 +181,6 @@ function walkNode(node) {
     case 'strong': {
       const trimmed = children.trim();
       const trailingSpace = children.endsWith(' ') ? ' ' : '';
-      console.log('STRONG node:', JSON.stringify({ children, trimmed, trailingSpace }));
       return `**${trimmed}**${trailingSpace}`;
     };
     case 'em':     return `_${children.trim()}_`;
@@ -198,7 +192,10 @@ function walkNode(node) {
     case 'li':     return `\n- ${children.trim()}`;
     case 'ul':
     case 'ol':     return `${children}\n`;
-    case 'pre':    return toBlockquote(children);
+    case 'pre': {
+      const cleaned = children.replace(/^`|`$/g, '').trim();
+      return '\n```\n' + cleaned + '\n```\n';
+    }
     default:       return children;
   }
 }

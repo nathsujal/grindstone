@@ -98,4 +98,21 @@ function buildFolderName(numStr, titleSlug) {
   return `${numStr}_${safeName}`;
 }
 
-module.exports = { createProblem, buildFolderName, sanitizeFolderName };
+/**
+ * Capitalize words and join with underscores for topic folder names.
+ * Reuses sanitizeFolderName for safety, then title-cases each segment.
+ *
+ * @param {string} str
+ * @returns {string}
+ */
+function capitalizeWords(str) {
+  // First sanitize (same rules as problem slugs), then title-case
+  const safe = sanitizeFolderName(str.replace(/-/g, '_'));
+  return safe
+    .split('_')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join('_') || 'Untitled';
+}
+
+module.exports = { createProblem, buildFolderName, sanitizeFolderName, capitalizeWords };

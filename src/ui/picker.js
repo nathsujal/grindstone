@@ -5,19 +5,47 @@ const vscode = require('vscode');
 // show problem picker - returns selected item or null
 async function showProblemPicker(items) {
   if (items.length === 0) {
-    vscode.window.showErrorMessage('GrindStone: No problem folders found.');
+    vscode.window.showErrorMessage('Grindstone: No problem folders found.');
     return null;
   }
   return vscode.window.showQuickPick(items, {
-    placeHolder: 'Select a problem',
+    title: 'Open Problem — Step 2 of 2',
+    placeHolder: 'Select problem',
     matchOnDescription: true,
   });
+}
+
+/**
+ * Show topic picker with problem counts.
+ *
+ * @param {{ topic: string, count: number }[]} topicItems  pre-computed topic + count pairs
+ * @returns {Promise<string|null>} selected topic name or null
+ */
+async function showTopicPickerWithCount(topicItems) {
+  if (topicItems.length === 0) {
+    vscode.window.showErrorMessage('Grindstone: No topics with problems found.');
+    return null;
+  }
+
+  const items = topicItems.map(({ topic, count }) => ({
+    label: `$(file-directory)  ${topic}`,
+    description: `${count} problem${count !== 1 ? 's' : ''}`,
+    topic,
+  }));
+
+  const picked = await vscode.window.showQuickPick(items, {
+    title: 'Open Problem — Step 1 of 2',
+    placeHolder: 'Select topic',
+    matchOnDescription: true,
+  });
+
+  return picked?.topic ?? null;
 }
 
 // show topic picker - returns selected topic or null
 async function showTopicPicker(topics) {
   if (topics.length === 0) {
-    vscode.window.showErrorMessage('GrindStone: No topic folders found.');
+    vscode.window.showErrorMessage('Grindstone: No topic folders found.');
     return null;
   }
   const topicPicks = topics.map((t) => ({ label: t }));
@@ -76,4 +104,5 @@ module.exports = {
   showTopicPicker,
   showDeletePicker,
   confirmDelete,
+  showTopicPickerWithCount,
 };

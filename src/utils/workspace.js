@@ -9,7 +9,7 @@ const { isDir } = require('./fs-utils');
 function getWorkspaceRoot() {
   const wf = vscode.workspace.workspaceFolders;
   if (!wf || wf.length === 0) {
-    vscode.window.showErrorMessage('GrindStone: No workspace open. Open via dsa.code-workspace.');
+    vscode.window.showErrorMessage('Grindstone: No workspace open. Open via dsa.code-workspace.');
     return null;
   }
   return wf[0].uri.fsPath;
@@ -34,7 +34,7 @@ function discoverTopics(root) {
       .filter((d) => isDir(path.join(root, d)));
     topics.push(...dirs.sort());
   } catch (e) {
-    vscode.window.showErrorMessage(`GrindStone: Cannot read workspace: ${e.message}`);
+    vscode.window.showErrorMessage(`Grindstone: Cannot read workspace: ${e.message}`);
   }
   return topics;
 }
@@ -70,6 +70,44 @@ function getNextProblemNumber(topicPath) {
   }
 }
 
+// get next topic number for auto-increment (e.g., "01_Arrays", "02_Strings" → "03")
+function getNextTopicNumber(root) {
+  try {
+    const dirs = fs.readdirSync(root).filter((d) => !isSpecialFolder(d) && isDir(path.join(root, d)));
+    const nums = dirs
+      .map((d) => parseInt(d.split('_')[0], 10))
+      .filter((n) => !isNaN(n));
+    if (nums.length === 0) return '01';
+    const max = Math.max(...nums);
+    return String(max + 1).padStart(2, '0');
+  } catch (e) {
+    console.warn('[workspace] cannot read root for topic numbering:', e.message);
+    return '01';
+  }
+}
+
+/**
+ * Discover topic folders that contain at least one problem.
+ * Filters out empty topics.
+ *
+ * @param {string} root
+ * @returns {string[]} sorted topic names with problems
+ */
+function discoverTopicsWithProblems(root) {
+  try {
+    const dirs = fs
+      .readdirSync(root)
+      .filter((d) => !isSpecialFolder(d))
+      .filter((d) => isDir(path.join(root, d)));
+    return dirs
+      .filter((topic) => scanProblemsInTopic(path.join(root, topic)).length > 0)
+      .sort();
+  } catch (e) {
+    console.warn('[workspace] cannot read workspace for topic scan:', e.message);
+    return [];
+  }
+}
+
 // scan all problems across all topics - returns QuickPick items
 function scanProblems(root) {
   const items = [];
@@ -90,7 +128,7 @@ function scanProblems(root) {
       }
     }
   } catch (e) {
-    vscode.window.showErrorMessage(`GrindStone: Cannot read workspace: ${e.message}`);
+    vscode.window.showErrorMessage(`Grindstone: Cannot read workspace: ${e.message}`);
   }
   return items;
 }
@@ -99,8 +137,10 @@ module.exports = {
   getWorkspaceRoot,
   isValidDsaWorkspace,
   discoverTopics,
+  discoverTopicsWithProblems,
   scanProblems,
   scanProblemsInTopic,
   parseProblemNumber,
   getNextProblemNumber,
+  getNextTopicNumber,
 };

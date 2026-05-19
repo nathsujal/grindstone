@@ -1,0 +1,38 @@
+# Dev tooling
+.gitignore
+.eslintignore
+.prettierrc
+vitest.config.js
+AGENTS.md
+CHANGELOG.md
+
+
+# Agent / AI tooling
+.gitnexus/
+.opencode/
+
+# Docs
+docs/
+
+# Tests
+tests/
+
+# VS Code dev files
+.vscode/
+
+# Git
+.git/
+
+# Backups
+*.backup
+*.bak
+
+# Dev dependencies (runtime deps in node_modules are needed)
+node_modules/eslint/
+node_modules/prettier/
+node_modules/vitest/
+node_modules/@eslint/
+node_modules/@vitest/
+node_modules/.bin/
+node_modules/.cache/
+node_modules/.package-lock.json

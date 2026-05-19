@@ -1,8 +1,10 @@
 # Grindstone
 
+![Grindstone Icon](icon.png)
+
 A persistent DSA (Data Structures & Algorithms) workstation layout manager for VS Code. Built for competitive programmers and developers practicing LeetCode-style problems.
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue)
+![Version](https://img.shields.io/badge/version-3.0.0-blue)
 ![VS Code](https://img.shields.io/badge/VS%20Code-%3E%3D1.74.0-green)
 
 ## Why Grindstone?
@@ -33,29 +35,31 @@ Opens a standardized workbench for every problem:
 └───────────┴──────────┴───────────────────────────────────┘
 ```
 
-- **Column 1**: Problem description (PROBLEM.md)
+- **Column 1**: Problem description (PROBLEM.md) — optionally as rendered Markdown preview
 - **Column 2**: Input test cases (input.txt)
 - **Column 3**: Program output (output.txt)
 - **Column 4**: Solution files as tabs (solution.py, solution.cpp, solution.rs)
 
 Test cases are automatically synced from PROBLEM.md to input.txt when you open a problem.
 
-### 2. Create Problems from LeetCode
+### 2. Markdown Preview (Optional)
+
+Enable `grindstone.openProblemAsPreview` in VS Code settings to open PROBLEM.md as a rendered Markdown preview instead of a raw text editor. The text editor opens behind the preview, so closing the preview automatically reveals the editable version.
+
+### 3. Create Problems from LeetCode
 
 Run `DSA: New Problem` (Cmd+Shift+N) and:
 1. Select a topic folder (e.g., 01_Arrays, 02_LinkedLists)
 2. Paste a LeetCode problem URL
 3. Confirm the preview
 
-Grindstone fetches the problem via LeetCode's GraphQL API and creates:
+Grindstone fetches the problem via LeetCode's GraphQL API (with retry and timeout handling) and creates:
 - `PROBLEM.md` - Full problem description with examples
 - `solution.py` - Python starter template
 - `solution.cpp` - C++ starter template
 - `solution.rs` - Rust starter template
 
-The problem is automatically added to TRACKER.md with Todo status and today's date.
-
-### 3. Run Your Solutions
+### 4. Run Your Solutions
 
 Run `DSA: Run Solution` (Cmd+Shift+R):
 - Automatically detects which problem is open
@@ -70,21 +74,12 @@ Supported languages:
 | C++ | solution.cpp | g++ -std=c++17 | Compiled binary |
 | Rust | solution.rs | rustc | Compiled binary |
 
-### 4. Delete Problems (Auto-Renumber)
+### 5. Delete Problems (Auto-Renumber)
 
 Run `DSA: Delete Problem` (Cmd+Shift+D):
 - Delete single problems or entire topics
 - Remaining problems are automatically renumbered
-- TRACKER.md is updated (deleted rows struck through)
-- Markdown links across the workspace are updated
 - If the deleted problem was open, layout is cleared or reopened
-
-### 5. Smart Link Indexing
-
-Grindstone maintains a `_progress/LINK_INDEX.md` file that tracks which markdown files reference which problems. This enables:
-- Fast updates when renaming/deleting problems
-- Only affected files are scanned (not entire workspace)
-- File watcher keeps index fresh automatically
 
 ## Installation
 
@@ -126,8 +121,7 @@ DSA/
 ├── 02_LinkedLists/
 │   └── ...
 ├── _progress/
-│   ├── TRACKER.md
-│   └── LINK_INDEX.md
+│   └── link-index.json    ← (legacy, safe to delete)
 ├── input.txt
 └── output.txt
 ```
@@ -136,7 +130,7 @@ DSA/
 
 | Folder | Purpose |
 |--------|---------|
-| `_progress/` | System files (TRACKER.md, LINK_INDEX.md) |
+| `_progress/` | Legacy system files (safe to delete if present) |
 | `_templates/` | Future: custom problem templates |
 | Topic folders (e.g., `01_Arrays/`) | Group problems by topic |
 
@@ -176,25 +170,22 @@ All commands are available via:
 | `DSA: Clear Layout` | Close all editors, reset to single pane |
 | `DSA: Run Solution` | Run the active solution file |
 
+## Configuration
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `grindstone.openProblemAsPreview` | boolean | `false` | Open PROBLEM.md as rendered Markdown preview |
+
 ## How It Works
 
 ### Extension Boot
 
 ```
 activate()
-├── ensureIndex()       ← Load or build LINK_INDEX.md
-├── startWatcher()      ← Monitor file changes
-└── registerCommands()  ← Register 6 commands
+├── loadState()           ← Restore last opened problem, problem count
+├── registerCommands()    ← Register commands with lazy loading
+└── registerLogger()      ← Structured logging (info, warn, error)
 ```
-
-### Link Index System
-
-1. **On activate**: Load index from disk if fresh, else rebuild
-2. **On command**: Always check freshness before executing
-3. **On file change**: File watcher triggers incremental re-index
-4. **On deactivate**: Flush any pending writes to disk
-
-The index tracks: `{ "topic/problem": ["referencing_file.md", ...] }`
 
 ### Layout Opening
 
@@ -203,7 +194,10 @@ openLayout(problemDir)
 ├── syncTestCasesToInput()     ← PROBLEM.md → input.txt
 ├── clearLayout()              ← Reset to single pane
 ├── setEditorLayout(4-pane)    ← Create column structure
-└── open files in columns      ← PROBLEM.md, input, output, solutions
+├── open PROBLEM.md            ← Text editor or Markdown preview
+├── open input.txt             ← Column 2
+├── open output.txt            ← Column 3
+└── open solution files        ← Column 4 (tabs)
 ```
 
 ### Problem Creation Flow
@@ -211,12 +205,10 @@ openLayout(problemDir)
 ```
 cmdNewProblem()
 ├── pickTopic()                ← QuickPick: 01_Arrays, 02_Strings, ...
-├── showInputBox()             ← Paste LeetCode URL
-├── fetchLeetCodeProblem()     ← GraphQL API call
+├── promptLeetCodeUrl()        ← Input box with URL validation
+├── fetchLeetCodeProblem()     ← GraphQL API (retry + timeout)
 ├── previewAndConfirm()        ← Show: title, difficulty, tags
 ├── createProblemFiles()       ← Generate PROBLEM.md, solutions
-├── appendTrackerRow()         ← Add to TRACKER.md
-├── onProblemCreated()         ← Update LINK_INDEX
 └── openLayout()               ← Open the new problem
 ```
 
@@ -227,23 +219,74 @@ cmdDeleteProblem()
 ├── pickTopic()                ← Which topic?
 ├── pickProblem()              ← Which problem(s)?
 ├── confirmDelete()            ← Yes/No confirmation
-├── scanProblemsInTopic()      ← Get remaining problems
-├── for each remaining:
-│   ├── rename(oldPath, newPath)
-│   ├── updateLinksAcrossWorkspace()
-│   ├── updateTrackerRow()
-│   └── onProblemRenamed()
-└── strikeTrackerRow()         ← Mark deleted row
+├── deleteSingleProblem()      ← Delete and renumber remaining
+│   └── for each remaining:
+│       └── rename(oldPath, newPath)
+└── clear or reopen layout     ← If deleted problem was open
 ```
 
-## Configuration
+## Development
 
-No configuration required. Grindstone works out of the box with sensible defaults.
+### Project Structure
 
-Future configuration options (planned):
-- Custom topic folder names
-- Additional solution file types
-- Layout preferences
+```
+src/
+├── extension.js              ← Entry point, lazy command registration
+├── constants.js              ← Global constants
+├── constants/
+│   └── layout.js             ← Layout-specific constants
+├── features/
+│   ├── problem-picker.js     ← Open problem commands
+│   ├── new-problem.js        ← Create from LeetCode
+│   ├── delete-problem.js     ← Delete with renumbering
+│   ├── clear-layout.js       ← Reset workspace
+│   └── run-solution.js       ← Execute solution files
+├── services/
+│   ├── leetcode.js           ← LeetCode GraphQL fetcher (retry + timeout)
+│   └── problem-creator.js    ← Problem folder and file creation
+├── ui/
+│   ├── layout.js             ← 4-pane layout management
+│   └── picker.js             ← QuickPick helpers
+└── utils/
+    ├── async.js              ← Async utilities (withTimeout, pollUntil)
+    ├── fs-utils.js           ← Core file operations
+    ├── lc-mapper.js          ← LeetCode → file mappers
+    ├── logger.js             ← Structured logging
+    ├── state.js              ← Persistent state (VS Code Memento)
+    ├── tab-utils.js          ← Tab detection utilities
+    ├── testcase-sync.js      ← PROBLEM.md → input.txt sync
+    └── workspace.js          ← Workspace scanning utilities
+```
+
+### Running Tests
+
+```bash
+# Run extension in development mode
+F5 (in VS Code)
+
+# Run lint
+npm run lint
+
+# Fix lint issues
+npm run lint:fix
+
+# Format code
+npm run format
+
+# Run tests
+npm run test
+
+# Watch tests
+npm run test:watch
+```
+
+### Tooling
+
+| Tool | Purpose |
+|------|---------|
+| ESLint | Code quality and style enforcement |
+| Prettier | Automatic code formatting |
+| Vitest | Unit testing framework |
 
 ## Troubleshooting
 
@@ -260,7 +303,7 @@ Create at least one topic folder with naming convention `NN_TopicName`:
 
 ### "Failed to fetch problem data"
 
-Check your internet connection. Grindstone fetches from LeetCode's GraphQL API.
+Check your internet connection. Grindstone fetches from LeetCode's GraphQL API with automatic retry (2 attempts, exponential backoff) and 10s timeout.
 
 ### "Compile failed" / "Runtime error"
 
@@ -269,44 +312,25 @@ Check output.txt in Column 3 for error details. Common issues:
 - C++: Missing `g++` compiler
 - Rust: Missing `rustc` compiler
 
-## Development
+## Changelog
 
-### Project Structure
-
-```
-src/
-├── extension.js          ← Entry point, registers all commands
-├── features/
-│   ├── problem-picker.js  ← Open problem commands
-│   ├── new-problem.js    ← Create from LeetCode
-│   ├── delete-problem.js← Delete with renumbering
-│   ├── clear-layout.js   ← Reset workspace
-│   └── run-solution.js   ← Execute solution files
-├── services/
-│   ├── leetcode.js       ← LeetCode GraphQL fetcher
-│   ├── link-index.js     ← Markdown link tracking
-│   └── index-watcher.js  ← File system watcher
-├── ui/
-│   ├── layout.js         ← 4-pane layout management
-│   └── picker.js         ← QuickPick helpers
-└── utils/
-    ├── workspace.js      ← Workspace scanning
-    ├── fs-utils.js       ← File operations
-    ├── tracker.js        ← TRACKER.md updates
-    ├── lc-mapper.js      ← LeetCode → file mappers
-    ├── testcase-sync.js  ← PROBLEM.md → input.txt
-    └── ...
-```
-
-### Running Tests
-
-```bash
-# Run extension in development mode
-F5 (in VS Code)
-
-# Run lint
-npm run lint
-```
+### v3.0.0 (Current)
+- **Added**: Markdown preview option for PROBLEM.md (`grindstone.openProblemAsPreview`)
+- **Added**: Structured logging system
+- **Added**: Persistent state management (VS Code Memento)
+- **Added**: Retry logic for LeetCode API calls
+- **Added**: Timeouts for compile/run operations
+- **Added**: ESLint, Prettier, Vitest tooling
+- **Added**: Unit tests (21 tests across 4 files)
+- **Added**: Lazy module loading for faster activation
+- **Changed**: Keybinding for Open Problem: Cmd+Shift+O → Cmd+Alt+O (conflict resolution)
+- **Changed**: Replaced regex HTML parsing with node-html-parser
+- **Changed**: Simplified PROBLEM.md and solution templates
+- **Changed**: Replaced sleep() with deterministic pollUntil() polling
+- **Removed**: Link-index system (LINK_INDEX.md, index-watcher)
+- **Removed**: Tracker system (TRACKER.md)
+- **Removed**: Markdown updater (md-updater)
+- **Removed**: Dead code (defaults.js, extract.js, unused exports)
 
 ## License
 

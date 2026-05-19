@@ -1,11 +1,12 @@
 'use strict';
 
-const vscode = require('vscode');
+const fs = require('fs');
 const path = require('path');
+const vscode = require('vscode');
 
-const { getWorkspaceRoot, discoverTopics } = require('../utils/workspace');
+const { getWorkspaceRoot, discoverTopics, getNextTopicNumber } = require('../utils/workspace');
 const { fetchLeetCodeProblem } = require('../services/leetcode');
-const { createProblem } = require('../services/problem-creator');
+const { createProblem, capitalizeWords } = require('../services/problem-creator');
 const { openLayout } = require('../ui/layout');
 
 // Main command — Cmd+Shift+N
@@ -28,39 +29,89 @@ async function cmdNewProblem() {
 
     const result = createProblem(root, topic, problemData);
     if (!result) {
-      vscode.window.showErrorMessage('GrindStone: Folder already exists.');
+      vscode.window.showErrorMessage(`Grindstone: ${topic} already exists.`);
       return;
     }
 
     await openLayout(result.problemDir);
     vscode.window.showInformationMessage(`✓ Created: ${path.basename(result.problemDir)} (LC #${problemData.questionId})`);
   } catch (err) {
-    vscode.window.showErrorMessage(`GrindStone New Problem: ${err.message}`);
+    vscode.window.showErrorMessage(`Grindstone New Problem: ${err.message}`);
     console.error('[new-problem]', err);
   }
 }
 
-// Step 1 — topic picker
+// Step 1 — topic picker with "Create new topic..." option
 // Returns plain string e.g. '01_Arrays', or null if cancelled.
 async function pickTopic(root) {
   const topics = discoverTopics(root);
-  if (topics.length === 0) {
-    vscode.window.showErrorMessage('GrindStone: No topic folders found.');
-    return null;
-  }
 
-  const items = topics.map((t) => ({
-    label: `$(file-directory)  ${t}`,
-    description: '',
-    topic: t,
-  }));
+  const items = [
+    {
+      label: '$(new-folder)  Create new topic...',
+      description: 'Create a new topic folder',
+      action: 'create',
+    },
+    ...topics.map((t) => ({
+      label: `$(file-directory)  ${t}`,
+      description: '',
+      action: 'select',
+      topic: t,
+    })),
+  ];
 
   const picked = await vscode.window.showQuickPick(items, {
     title: 'New Problem — Step 1 of 3',
-    placeHolder: 'Select topic folder',
+    placeHolder: 'Select topic or create new',
   });
 
-  return picked?.topic ?? null;
+  if (!picked) return null;
+
+  if (picked.action === 'create') {
+    const newTopic = await createNewTopic(root);
+    if (newTopic) {
+      vscode.window.showInformationMessage(`✓ Created topic: ${newTopic}`);
+    }
+    return newTopic;
+  }
+
+  return picked.topic ?? null;
+}
+
+/**
+ * Prompt user to create a new topic folder.
+ *
+ * @param {string} root
+ * @returns {Promise<string|null>} topic name or null if cancelled
+ */
+async function createNewTopic(root) {
+  const name = await vscode.window.showInputBox({
+    title: 'New Problem — Create Topic',
+    prompt: 'Enter topic name (e.g., "Dynamic Array")',
+    placeHolder: 'Dynamic Array',
+    ignoreFocusOut: true,
+    validateInput: (val) => {
+      if (!val?.trim()) return 'Topic name is required';
+      if (val.trim().length < 2) return 'Topic name too short (min 2 chars)';
+      return null;
+    },
+  });
+
+  if (!name) return null;
+
+  const sanitizedName = capitalizeWords(name);
+  const nextNum = getNextTopicNumber(root);
+  const topicName = `${nextNum}_${sanitizedName}`;
+  const topicPath = path.join(root, topicName);
+
+  if (fs.existsSync(topicPath)) {
+    vscode.window.showErrorMessage(`GrindStone: Topic "${topicName}" already exists.`);
+    return null;
+  }
+
+  fs.mkdirSync(topicPath, { recursive: true });
+
+  return topicName;
 }
 
 // Step 2 — prompt user for LeetCode URL with validation
@@ -106,7 +157,7 @@ async function fetchWithProgress(url) {
   );
 
   if (!problemData) {
-    vscode.window.showErrorMessage('GrindStone: Failed to fetch problem data.');
+    vscode.window.showErrorMessage('Grindstone: Failed to fetch problem data.');
   }
   return problemData;
 }

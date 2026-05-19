@@ -52,9 +52,18 @@ vitest.config.js
 .env.*.local
 
 # Test Coverage
-tests/
 coverage/
 .nyc_output/
+
+# Agent / AI tooling
+.gitnexus/
+.opencode/
+CLAUDE.md
+
+# Temp commit helpers
+COMMIT-HEAD.md
+COMMIT-STAGED.md
+IMPLEMENT.md
 
 # Temp / Scratch
 *.tmp
@@ -66,6 +75,6 @@ coverage/
 *.backup
 *.bakup.js
 
-Misc
+# Misc
 tmp/
 cache/
