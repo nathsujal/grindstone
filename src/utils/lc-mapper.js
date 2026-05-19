@@ -49,7 +49,7 @@ ${testCasesSection}
 
 ---
 
-${hintsSection ? '\n---\n\n## Hints\n\n' + hintsSection + '\n\n---' : '---'}
+${hintsSection ? hintsSection + '\n\n---' : ''}
 
 `;
 }
